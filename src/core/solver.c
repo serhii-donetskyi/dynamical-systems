@@ -1,10 +1,10 @@
 #include "core/solver.h"
 
-N solver_rk4_data_size(const ode_t *ode) {
+N solver_rk4_data_size(const ode_t *restrict ode) {
     return sizeof(R) * (ode->n * 5);
 }
 
-void solver_rk4(ode_t *ode, solver_t *solver) {
+void solver_rk4(ode_t *restrict ode, solver_t *restrict solver) {
     N n = ode->n;
     R t = ode->t;
     R *x = ode->x;

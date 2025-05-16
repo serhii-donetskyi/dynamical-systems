@@ -13,6 +13,6 @@ typedef struct ode_t {
     ode_fn_t fn;
 } ode_t;
 
-void ode_linear(R t, const R *x, const R *p, R *dxdt);
+void ode_linear(R t, const R *restrict x, const R *restrict p, R *restrict dxdt);
 
 #endif // ODE_H 

@@ -3,7 +3,7 @@
 #include <string.h> // For memcpy, memset
 #include <math.h>   // For sin, cos in pendulum
 
-void ode_linear(R t, const R *x, const R *p, R *dxdt) {
+void ode_linear(R t, const R *restrict x, const R *restrict p, R *restrict dxdt) {
     (void)t;
     const N n = ((N*)p)[0];
     p++;

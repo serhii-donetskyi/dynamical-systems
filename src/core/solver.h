@@ -16,7 +16,7 @@ typedef struct solver_t {
     data_size_t data_size;
 } solver_t;
 
-N solver_rk4_data_size(const ode_t *ode);
-void solver_rk4(ode_t *ode, solver_t *solver);
+N solver_rk4_data_size(const ode_t *restrict ode);
+void solver_rk4(ode_t *restrict ode, solver_t *restrict solver);
 
 #endif // SOLVER_H 
