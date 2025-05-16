@@ -94,12 +94,12 @@ static PyGetSetDef OdeObjectPy_getsetters[] = {
 static void OdeObjectPy_dealloc(OdeObjectPy *self) {
     if (self->c_ode) {
         if (self->c_ode->x) {
-            PyMem_Free(self->c_ode->x);
+            PyMem_Free((void*)self->c_ode->x);
         }
         if (self->c_ode->p) {
-            PyMem_Free(self->c_ode->p);
+            PyMem_Free((void*)self->c_ode->p);
         }
-        PyMem_Free(self->c_ode);
+        PyMem_Free((void*)self->c_ode);
         self->c_ode = NULL;
     }
     Py_TYPE(self)->tp_free((PyObject *)self);
@@ -223,11 +223,14 @@ PyObject* py_create_ode_linear(PyObject *self_module, PyObject *args, PyObject *
         PyMem_Free(p);
         return NULL;
     }
-    ode_obj->c_ode->t = t;
-    ode_obj->c_ode->x = x;
-    ode_obj->c_ode->p = p;
-    ode_obj->c_ode->n = (N)x_len;
-    ode_obj->c_ode->fn = ode_linear;
+    ode_t ode = {
+        .t = t,
+        .x = x,
+        .p = p,
+        .n = (N)x_len,
+        .fn = ode_linear
+    };
+    memcpy(ode_obj->c_ode, &ode, sizeof(ode_t));
 
     return (PyObject *)ode_obj;
 }

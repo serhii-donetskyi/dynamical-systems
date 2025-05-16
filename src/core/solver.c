@@ -5,18 +5,19 @@ N solver_rk4_data_size(const ode_t *restrict ode) {
 }
 
 void solver_rk4(ode_t *restrict ode, solver_t *restrict solver) {
-    N n = ode->n;
-    R t = ode->t;
-    R *x = ode->x;
-    R *p = ode->p;
+    const N n = ode->n;
+    const R h = solver->params[0];
+
+    #define t (ode->t)
+    #define x (ode->x)
+    #define p (ode->p)
     #define fn (ode->fn)
 
-    R h = solver->params[0];
-    R *y = solver->data;
-    R *k1 = y + n;
-    R *k2 = k1 + n;
-    R *k3 = k2 + n;
-    R *k4 = k3 + n;
+    #define y (solver->data)
+    #define k1 (y+n)
+    #define k2 (k1+n)
+    #define k3 (k2+n)
+    #define k4 (k3+n)
 
     fn(t, x, p, k1);
     for (N i = 0; i < n; i++) {
@@ -34,7 +35,16 @@ void solver_rk4(ode_t *restrict ode, solver_t *restrict solver) {
     for (N i = 0; i < n; i++) {
         x[i] += (k1[i] + 2 * k2[i] + 2 * k3[i] + k4[i]) * h / 6;
     }
-    ode->t += h;
+    t += h;
+
+    #undef k4
+    #undef k3
+    #undef k2
+    #undef k1
+    #undef y
 
     #undef fn
+    #undef p
+    #undef x
+    #undef t
 }

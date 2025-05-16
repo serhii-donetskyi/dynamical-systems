@@ -5,9 +5,9 @@
 static void SolverObjectPy_dealloc(SolverObjectPy *self) {
     if (self->c_solver) {
         if (self->c_solver->params) {
-            PyMem_Free(self->c_solver->params);
+            PyMem_Free((void*)self->c_solver->params);
         }
-        PyMem_Free(self->c_solver);
+        PyMem_Free((void*)self->c_solver);
         self->c_solver = NULL;
     }
     Py_TYPE(self)->tp_free((PyObject *)self);
@@ -79,18 +79,21 @@ PyObject* py_create_solver_rk4(PyObject *self_module, PyObject *args, PyObject *
         return NULL;
     }
 
-    solver_py_obj->c_solver->params = (R *)PyMem_Malloc(sizeof(R)); // For h
-    if (!solver_py_obj->c_solver->params) {
+    R *params = (R *)PyMem_Malloc(sizeof(R)); // For h
+    if (!params) {
         PyErr_NoMemory();
-        PyMem_Free(solver_py_obj->c_solver); // Free the c_solver struct
+        PyMem_Free((void*)solver_py_obj->c_solver); // Free the c_solver struct
         Py_DECREF(solver_py_obj);          // Free the Python wrapper
         return NULL;
     }
-    
-    solver_py_obj->c_solver->params[0] = h;
-    solver_py_obj->c_solver->step = solver_rk4;
-    solver_py_obj->c_solver->data_size = solver_rk4_data_size;
-    solver_py_obj->c_solver->data = NULL;
+    *params = h;
+    solver_t solver = {
+        .params = params,
+        .step = solver_rk4,
+        .data_size = solver_rk4_data_size,
+        .data = NULL
+    };
+    memcpy(solver_py_obj->c_solver, &solver, sizeof(solver_t));
     
     return (PyObject *)solver_py_obj;
 }

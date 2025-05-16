@@ -1,7 +1,7 @@
 #include "py_job.h"
 #include "py_ode.h"
 #include "py_solver.h"
-
+#include <time.h>
 PyObject* py_phase_portrait(PyObject* self, PyObject* args, PyObject* kwds) {
     (void)self;
     char* kwlist[] = {"ode", "solver", "tend", "max_steps", NULL};
@@ -28,12 +28,16 @@ PyObject* py_phase_portrait(PyObject* self, PyObject* args, PyObject* kwds) {
         }
     }
 
+    clock_t start = clock();
     for (N i = 0; i < max_steps; i++) {
         if (ode->c_ode->t >= tend) {
             break;
         }
         solver->c_solver->step(ode->c_ode, solver->c_solver);
     }
+    clock_t end = clock();
+    double time_spent = (double)(end - start) / CLOCKS_PER_SEC;
+    printf("Time taken: %f seconds\n", time_spent);
 
     PyMem_Free(solver->c_solver->data);
     solver->c_solver->data = NULL;

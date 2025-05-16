@@ -10,10 +10,10 @@ typedef N (*data_size_t)(const ode_t *ode);
 typedef void (*solver_step_t)(ode_t *ode, struct solver_t *solver);
 
 typedef struct solver_t {
-    R *params;
+    const R *params;
     R *data;
-    solver_step_t step;
-    data_size_t data_size;
+    const solver_step_t step;
+    const data_size_t data_size;
 } solver_t;
 
 N solver_rk4_data_size(const ode_t *restrict ode);
