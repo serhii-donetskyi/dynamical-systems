@@ -19,7 +19,7 @@ dynamical_systems_extension = Extension(
         # 'src/c_core'
     ],
     # Uncomment for more warnings during development:
-    extra_compile_args=["-std=c11", "-Wall", "-Wextra", "-Werror", "-pedantic", "-O2"],
+    extra_compile_args=["-std=c11", "-Wall", "-Wextra", "-Werror", "-pedantic", "-O3", "-ffast-math"],
     # extra_link_args=[]
 )
 
