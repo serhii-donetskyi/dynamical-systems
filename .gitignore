@@ -3,3 +3,4 @@
 .cursor*
 *.so
 build*
+__pycache__*
