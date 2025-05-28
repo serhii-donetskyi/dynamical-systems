@@ -55,7 +55,7 @@ static PyObject *OdeObjectPy_get_arguments(OdeObjectPy *self, PyObject *Py_UNUSE
     argument_t *arguments = self->factory->output->arguments;
     PyObject *dict = PyDict_New();
     if (!dict) return NULL;
-    for (N i = 0; arguments[i].name != 0; ++i) {
+    for (N i = 0; arguments[i].name; ++i) {
         PyObject *value;
         switch (arguments[i].type) {
             case NATURAL:
@@ -292,7 +292,7 @@ static PyObject *OdeFactoryObjectPy_get_argument_types(OdeFactoryObjectPy *self,
     PyObject *dict = PyDict_New();
     if (!dict) return NULL;
     
-    for (N i = 0; params[i].name != 0; ++i) {
+    for (N i = 0; params[i].name; ++i) {
         PyObject *type_name;
         switch (params[i].type) {
             case NATURAL:

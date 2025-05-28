@@ -1,27 +1,12 @@
 import dynamical_systems
-import time
-x = [0.0, 1.0]
-p = [0, 1.0, -1.0, 0.0]
-t_initial = 0.0 # Define the initial time
 
-# Call with all three arguments, using keywords for clarity
-ode = dynamical_systems.create_ode_linear(t=t_initial, x=x, p=p)
+odeFactory = dynamical_systems.OdeFactory(libpath="build/ode/linear.so")
 
-print(type(ode))
-print(ode.t)
-print(ode.n)
-print(ode.x)
-print(ode.p)
-# You might want to add further assertions or calls here to test the ode object
+print("Available attributes and methods:")
+print(dir(odeFactory))
+print(odeFactory.get_argument_types())
 
-# This call is already positional
-solver = dynamical_systems.create_solver_rk4(0.01)
-print(type(solver))
+ode = odeFactory.create_ode(n=2)
 
-start_time = time.time()
-dynamical_systems.phase_portrait(ode, solver, 1000000, 1_000_000_000)
-end_time = time.time()
-print(f"Phase portrait computation took {end_time - start_time:.2f} seconds")
-
-print(ode.t, ode.x)
-
+print(ode.get_name())
+print(ode.get_arguments())
