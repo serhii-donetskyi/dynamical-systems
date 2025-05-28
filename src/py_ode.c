@@ -1,134 +1,343 @@
 #include "py_ode.h"
-#include "py_utils.h"
+#include "core/ode.h"
 #include <stdlib.h>
+#include <dlfcn.h>  // For RTLD_LAZY
+#include <string.h>
 
-// Helper function to convert R array to Python list
-static PyObject* R_array_to_PyList(const R *c_array, N array_size) {
-    if (c_array == NULL && array_size > 0) {
-        PyErr_SetString(PyExc_ValueError, "Input C array is NULL but size is non-zero.");
-        return NULL;
-    }
-    PyObject *py_list = PyList_New((Py_ssize_t)array_size);
-    if (py_list == NULL) {
-        return NULL;
-    }
-    for (N i = 0; i < array_size; ++i) {
-        PyObject *py_float = PyFloat_FromDouble((double)c_array[i]);
-        if (py_float == NULL) {
-            Py_DECREF(py_list);
-            return NULL;
-        }
-        if (PyList_SetItem(py_list, (Py_ssize_t)i, py_float) < 0) { // Steals py_float ref
-            // Py_DECREF(py_float); // Not needed as SetItem would have DECREF'd on failure if it took it
-            Py_DECREF(py_list);
-            return NULL;
-        }
-    }
-    return py_list;
-}
-
-// --- OdeObjectPy properties (getset) ---
-
-// Getter for 't'
-static PyObject *OdeObjectPy_get_t(OdeObjectPy *self, void *closure) {
-    (void)closure;
-    if (!self->c_ode) {
-        PyErr_SetString(PyExc_AttributeError, "C ODE object not initialized");
-        return NULL;
-    }
-    return PyFloat_FromDouble(self->c_ode->t);
-}
-
-// Getter for 'n' (dimension, read-only)
-static PyObject *OdeObjectPy_get_n(OdeObjectPy *self, void *closure) {
-    (void)closure;
-    if (!self->c_ode) {
-        PyErr_SetString(PyExc_AttributeError, "C ODE object not initialized");
-        return NULL;
-    }
-    return PyLong_FromSize_t(self->c_ode->n); // Assuming N is size_t or compatible
-}
-
-// Getter for 'x' (state vector, read-only copy)
-static PyObject *OdeObjectPy_get_x(OdeObjectPy *self, void *closure) {
-    (void)closure;
-    if (!self->c_ode) {
-        PyErr_SetString(PyExc_AttributeError, "C ODE object not initialized");
-        return NULL;
-    }
-    if (!self->c_ode->x) {
-        PyErr_SetString(PyExc_AttributeError, "'x' array is NULL in C ODE object");
-        return NULL;
-    }
-    return R_array_to_PyList(self->c_ode->x, self->c_ode->n);
-}
-
-// Getter for 'p' (parameter vector/matrix, read-only copy)
-// This will expose the full p vector including the first 'n' element.
-// A more advanced version could return only the matrix part.
-static PyObject *OdeObjectPy_get_p(OdeObjectPy *self, void *closure) {
-    (void)closure;
-    if (!self->c_ode) {
-        PyErr_SetString(PyExc_AttributeError, "C ODE object not initialized");
-        return NULL;
-    }
-    if (!self->c_ode->p) {
-        PyErr_SetString(PyExc_AttributeError, "'p' array is NULL in C ODE object");
-        return NULL;
-    }
-    // Size of p is n*n for the matrix, plus 1 for the stored 'n'
-    N p_total_len = (self->c_ode->n * self->c_ode->n) + 1;
-    return R_array_to_PyList(self->c_ode->p, p_total_len);
-}
-
-static PyGetSetDef OdeObjectPy_getsetters[] = {
-    {"t", (getter)OdeObjectPy_get_t, NULL, "time attribute (float)", NULL},
-    {"n", (getter)OdeObjectPy_get_n, NULL, "dimension of state vector (int, read-only)", NULL},
-    {"x", (getter)OdeObjectPy_get_x, NULL, "state vector (list of floats, read-only copy)", NULL},
-    {"p", (getter)OdeObjectPy_get_p, NULL, "parameter vector/matrix (list of floats, read-only copy, includes leading n)", NULL},
-    {NULL, NULL, NULL, NULL, NULL}  /* Sentinel */
-};
-
-// --- OdeObjectPy methods ---
-
-static void OdeObjectPy_dealloc(OdeObjectPy *self) {
-    if (self->c_ode) {
-        if (self->c_ode->x) {
-            PyMem_Free((void*)self->c_ode->x);
-        }
-        if (self->c_ode->p) {
-            PyMem_Free((void*)self->c_ode->p);
-        }
-        PyMem_Free((void*)self->c_ode);
-        self->c_ode = NULL;
-    }
-    Py_TYPE(self)->tp_free((PyObject *)self);
-}
-
+// OdeObjectPy implementation
 static PyObject *OdeObjectPy_new(PyTypeObject *type, PyObject *args, PyObject *kwds) {
     (void)args;
     (void)kwds;
     OdeObjectPy *self = (OdeObjectPy *)type->tp_alloc(type, 0);
-    if (self) {
-        self->c_ode = NULL;
+    if (!self) {
+        return NULL;
     }
     return (PyObject *)self;
 }
 
 static int OdeObjectPy_init(OdeObjectPy *self, PyObject *args, PyObject *kwds) {
-    // For now, do nothing. All construction should be done via the factory functions.
     (void)self;
     (void)args;
     (void)kwds;
-    PyErr_SetString(PyExc_NotImplementedError, "Direct Ode() construction is not supported. Use a factory function.");
+    PyErr_SetString(PyExc_NotImplementedError, "Direct Ode() construction is not supported. Use a factory class instead.");
     return -1;
 }
 
-static PyMemberDef OdeObjectPy_members[] = {
-    // You can expose fields here if needed
-    {NULL, 0, 0, 0, NULL}  /* Sentinel */
+static void OdeObjectPy_dealloc(OdeObjectPy *self) {
+    if (self->ode) {
+        if (self->ode->x) PyMem_Free(self->ode->x);
+        if (self->ode->p) PyMem_Free(self->ode->p);
+        if (self->ode->consts) PyMem_Free((void *)self->ode->consts);
+        if (self->ode) PyMem_Free(self->ode);
+        self->ode = NULL;
+    }
+    if (self->factory) {
+        Py_DECREF(self->factory);
+        self->factory = NULL;
+    }
+    Py_TYPE(self)->tp_free((PyObject *)self);
+}
+
+// get_name() method: returns the factory name
+static PyObject *OdeObjectPy_get_name(OdeObjectPy *self, PyObject *Py_UNUSED(ignored)) {
+    if (!self->ode || !self->factory->output->name) {
+        PyErr_SetString(PyExc_RuntimeError, "Invalid ode or name");
+        return NULL;
+    }
+    return PyUnicode_FromString(self->factory->output->name);
+}
+
+static PyObject *OdeObjectPy_get_arguments(OdeObjectPy *self, PyObject *Py_UNUSED(ignored)) {
+    if (!self->ode || !self->factory) {
+        PyErr_SetString(PyExc_RuntimeError, "Invalid ode or arguments");
+        return NULL;
+    }
+    argument_t *arguments = self->factory->output->arguments;
+    PyObject *dict = PyDict_New();
+    if (!dict) return NULL;
+    for (N i = 0; arguments[i].name != 0; ++i) {
+        PyObject *value;
+        switch (arguments[i].type) {
+            case NATURAL:
+                value = PyLong_FromLong(arguments[i].value.n);
+                break;
+            case INTEGER:
+                value = PyLong_FromLong(arguments[i].value.i);
+                break;
+            case REAL:
+                value = PyFloat_FromDouble(arguments[i].value.r);
+                break;
+            default:
+                value = PyUnicode_FromString("UNKNOWN");
+                break;
+        }
+        if (!value) {
+            Py_DECREF(dict);
+            return NULL;
+        }
+        PyDict_SetItemString(dict, arguments[i].name, value);
+    }
+    return dict;
+}
+
+static PyObject *OdeObjectPy_get_x_size(OdeObjectPy *self, PyObject *Py_UNUSED(ignored)) {
+    if (!self->ode || !self->factory) {
+        PyErr_SetString(PyExc_RuntimeError, "Invalid ode or arguments");
+        return NULL;
+    }
+    return PyLong_FromLong(self->ode->x_size);
+}
+
+static PyObject *OdeObjectPy_get_p_size(OdeObjectPy *self, PyObject *Py_UNUSED(ignored)) {
+    if (!self->ode || !self->factory) {
+        PyErr_SetString(PyExc_RuntimeError, "Invalid ode or arguments");
+        return NULL;
+    }
+    return PyLong_FromLong(self->ode->p_size);
+}
+
+// OdeFactoryObjectPy implementation
+static PyObject *OdeFactoryObjectPy_new(PyTypeObject *type, PyObject *args, PyObject *kwds) {
+    (void)args;
+    (void)kwds;
+    OdeFactoryObjectPy *self = (OdeFactoryObjectPy *)type->tp_alloc(type, 0);
+    if (!self) {
+        return NULL;
+    }
+    self->output = NULL;
+    return (PyObject *)self;
+}
+
+static int OdeFactoryObjectPy_init(OdeFactoryObjectPy *self, PyObject *args, PyObject *kwds) {
+    char *kwlist[] = {"libpath", NULL};
+    const char *libpath = NULL;
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "s", kwlist, &libpath)) {
+        return -1;
+    }
+    void *handle = dlopen(libpath, RTLD_LAZY);
+    if (!handle) {
+        PyErr_SetString(PyExc_RuntimeError, dlerror());
+        return -1;
+    }
+    ode_output_t *output = (ode_output_t *)dlsym(handle, "ode_output");
+    if (!output) {
+        PyErr_SetString(PyExc_RuntimeError, dlerror());
+        dlclose(handle);
+        return -1;
+    }
+    self->output = output;
+    self->handle = handle;
+    return 0;
+}
+
+static void OdeFactoryObjectPy_dealloc(OdeFactoryObjectPy *self) {
+    if (self->output) {
+        dlclose(self->handle);
+        self->output = NULL;
+        self->handle = NULL;
+    }
+    Py_TYPE(self)->tp_free((PyObject *)self);
+}
+
+// Factory method to create an OdeObjectPy
+static PyObject *OdeFactoryObjectPy_create_ode(PyObject *self, PyObject *args, PyObject *kwargs) {
+    OdeFactoryObjectPy *factory = (OdeFactoryObjectPy *)self;
+    if (!factory->output || !factory->output->x_size || !factory->output->p_size || !factory->output->fn) {
+        PyErr_SetString(PyExc_RuntimeError, "Invalid output or x_size or p_size or fn");
+        return NULL;
+    }
+
+    // Count number of arguments
+    N arg_size = 0;
+    while (factory->output->arguments[arg_size++].name);
+    arg_size--; // Adjust for the extra increment
+
+    // Check if we have the correct number of arguments
+    Py_ssize_t nargs = PyTuple_GET_SIZE(args);
+    Py_ssize_t nkwargs = kwargs ? PyDict_Size(kwargs) : 0;
+    
+    if (nargs + nkwargs != (Py_ssize_t)arg_size) {
+        PyErr_Format(PyExc_TypeError, "Expected %d arguments, got %zd", (int)arg_size, nargs + nkwargs);
+        return NULL;
+    }
+
+    // Parse each argument
+    N success = 1;
+    for (N i = 0; i < arg_size; i++) {
+        PyObject *arg = NULL;
+        
+        // Try to get argument from positional args first
+        if ((Py_ssize_t)i < nargs) {
+            arg = PyTuple_GET_ITEM(args, i);
+        }
+        // If not in positional args and we have keyword args, try to get from kwargs
+        else if (kwargs) {
+            arg = PyDict_GetItemString(kwargs, factory->output->arguments[i].name);
+        }
+
+        // If we still don't have an argument, it's an error
+        if (!arg) {
+            PyErr_Format(PyExc_TypeError, "Missing required argument '%s'", factory->output->arguments[i].name);
+            success = 0;
+            break;
+        }
+
+        switch (factory->output->arguments[i].type) {
+            case NATURAL:
+                if (!PyLong_Check(arg)) {
+                    PyErr_Format(PyExc_TypeError, "Argument '%s' must be a non-negative integer", factory->output->arguments[i].name);
+                    success = 0;
+                    break;
+                }
+                factory->output->arguments[i].value.i = PyLong_AsLong(arg);
+                if (PyErr_Occurred()) {
+                    success = 0;
+                    break;
+                }
+                if (factory->output->arguments[i].value.i < 0) {
+                    PyErr_Format(PyExc_RuntimeError, "Argument '%s' must be a non-negative integer", factory->output->arguments[i].name);
+                    success = 0;
+                }
+                break;
+            case INTEGER:
+                if (!PyLong_Check(arg)) {
+                    PyErr_Format(PyExc_TypeError, "Argument '%s' must be an integer", factory->output->arguments[i].name);
+                    success = 0;
+                    break;
+                }
+                factory->output->arguments[i].value.i = PyLong_AsLong(arg);
+                if (PyErr_Occurred()) {
+                    success = 0;
+                    break;
+                }
+                break;
+            case REAL:
+                if (!PyFloat_Check(arg) && !PyLong_Check(arg)) {
+                    PyErr_Format(PyExc_TypeError, "Argument '%s' must be a float or integer", factory->output->arguments[i].name);
+                    success = 0;
+                    break;
+                }
+                factory->output->arguments[i].value.r = PyFloat_AsDouble(arg);
+                if (PyErr_Occurred()) {
+                    success = 0;
+                    break;
+                }
+                break;
+            default:
+                PyErr_SetString(PyExc_RuntimeError, "Invalid argument type");
+                success = 0;
+                break;
+        }
+        if (!success) {
+            break;
+        }
+    }
+
+    if (!success) {
+        return NULL;
+    }
+
+    // Create ODE object
+    OdeObjectPy *py_ode = (OdeObjectPy *)OdeTypePy.tp_alloc(&OdeTypePy, 0);
+
+    // Allocate and initialize ODE structure
+    ode_t *ode = PyMem_Malloc(sizeof(ode_t));
+    N x_size = factory->output->x_size(factory->output->arguments);
+    N p_size = factory->output->p_size(factory->output->arguments);
+    R *x = x_size > 0 ? PyMem_Malloc(sizeof(R) * x_size) : 0;
+    R *p = p_size > 0 ? PyMem_Malloc(sizeof(R) * p_size) : 0;
+    number *consts = arg_size > 0 ? PyMem_Malloc(sizeof(number) * arg_size) : 0;
+
+    if (!py_ode || !ode || !x_size || !x || (p_size > 0 && !p) || (arg_size > 0 && !consts)) {
+        if (x_size == 0){
+            PyErr_Format(PyExc_RuntimeError, "Failed to create ODE: x_size is 0");
+        } else {
+            PyErr_SetString(PyExc_RuntimeError, "Failed to create ODE");
+        }
+        if (py_ode) Py_DECREF(py_ode);
+        if (ode) PyMem_Free(ode);
+        if (x) PyMem_Free(x);
+        if (p) PyMem_Free(p);
+        if (consts) PyMem_Free(consts);
+        return NULL;
+    }
+
+    // Copy argument values to consts
+    for (N i = 0; i < arg_size; i++) {
+        consts[i].n = factory->output->arguments[i].value.n;
+    }
+    ode_t tmp = {
+        .x_size = x_size,
+        .p_size = p_size,
+        .fn = factory->output->fn,
+        .x = x,
+        .p = p,
+        .consts = consts,
+    };
+    memcpy(ode, &tmp, sizeof(ode_t));
+    py_ode->ode = ode;
+    py_ode->factory = factory;
+    Py_INCREF(factory);
+
+    return (PyObject *)py_ode;
+}
+
+// get_argument_types() method: returns a dictionary mapping argument names to their types
+static PyObject *OdeFactoryObjectPy_get_argument_types(OdeFactoryObjectPy *self, PyObject *Py_UNUSED(ignored)) {
+    if (!self->output || !self->output->arguments) {
+        PyErr_SetString(PyExc_RuntimeError, "Invalid output or arguments");
+        return NULL;
+    }
+    argument_t *params = self->output->arguments;
+    PyObject *dict = PyDict_New();
+    if (!dict) return NULL;
+    
+    for (N i = 0; params[i].name != 0; ++i) {
+        PyObject *type_name;
+        switch (params[i].type) {
+            case NATURAL:
+                type_name = PyUnicode_FromString("NATURAL");
+                break;
+            case INTEGER:
+                type_name = PyUnicode_FromString("INTEGER");
+                break;
+            case REAL:
+                type_name = PyUnicode_FromString("REAL");
+                break;
+            default:
+                type_name = PyUnicode_FromString("UNKNOWN");
+                break;
+        }
+        if (!type_name) {
+            Py_DECREF(dict);
+            return NULL;
+        }
+        if (PyDict_SetItemString(dict, params[i].name, type_name) < 0) {
+            Py_DECREF(type_name);
+            Py_DECREF(dict);
+            return NULL;
+        }
+        Py_DECREF(type_name);
+    }
+    return dict;
+}
+
+// Method tables
+static PyMethodDef OdeObjectPy_methods[] = {
+    {"get_name", (PyCFunction)OdeObjectPy_get_name, METH_NOARGS, "Return the name of the ODE."},
+    {"get_arguments", (PyCFunction)OdeObjectPy_get_arguments, METH_NOARGS, "Get arguments of the ODE."},
+    {"get_x_size", (PyCFunction)OdeObjectPy_get_x_size, METH_NOARGS, "Get x_size of the ODE."},
+    {"get_p_size", (PyCFunction)OdeObjectPy_get_p_size, METH_NOARGS, "Get p_size of the ODE."},
+    {NULL, NULL, 0, NULL}  /* Sentinel */
 };
 
+static PyMethodDef OdeFactoryObjectPy_methods[] = {
+    {"create_ode", (PyCFunction)(void(*)(void))OdeFactoryObjectPy_create_ode, METH_VARARGS | METH_KEYWORDS, "Create a new ODE instance."},
+    {"get_argument_types", (PyCFunction)OdeFactoryObjectPy_get_argument_types, METH_NOARGS, "Return a dictionary mapping argument names to their types."},
+    {NULL, NULL, 0, NULL}  /* Sentinel */
+};
+
+// Type objects
 PyTypeObject OdeTypePy = {
     PyVarObject_HEAD_INIT(NULL, 0)
     .tp_name = "dynamical_systems.Ode",
@@ -138,102 +347,21 @@ PyTypeObject OdeTypePy = {
     .tp_new = OdeObjectPy_new,
     .tp_init = (initproc)OdeObjectPy_init,
     .tp_dealloc = (destructor)OdeObjectPy_dealloc,
-    .tp_members = OdeObjectPy_members,
-    .tp_getset = OdeObjectPy_getsetters, // Assign getsetters
+    .tp_methods = OdeObjectPy_methods,
     .tp_doc = "Ode object wrapping a C ode_t struct",
 };
 
-// --- Factory functions ---
-
-PyObject* py_create_ode_linear(PyObject *self_module, PyObject *args, PyObject *kwds) {
-    (void)self_module; // To indicate self_module is intentionally unused
-
-    char *kwlist[] = {"t", "x", "p", NULL};
-    R t = 0.0;
-    PyObject *x_obj = NULL;
-    PyObject *p_obj = NULL;
-
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "dOO", kwlist, &t, &x_obj, &p_obj)) {
-        return NULL;
-    }
-
-    // Optionally, check that they are sequences (lists, tuples, etc.)
-    if (!PySequence_Check(x_obj) || !PySequence_Check(p_obj)) {
-        PyErr_SetString(PyExc_TypeError, "Arguments 'x' and 'p' must be sequences (lists or tuples)");
-        return NULL;
-    }
-
-    Py_ssize_t x_len = PySequence_Length(x_obj);
-    Py_ssize_t p_len = PySequence_Length(p_obj);
-
-    if (x_len < 0 || p_len < 0) { // PySequence_Length returns -1 on error
-        // Error already set by PySequence_Length
-        return NULL;
-    }
-    
-    if (x_len == 0) {
-        PyErr_SetString(PyExc_ValueError, "Argument 'x' cannot be an empty sequence.");
-        return NULL;
-    }
-
-    if ((N)x_len * (N)x_len != (N)p_len) {
-        PyErr_SetString(PyExc_ValueError, "Argument 'p' must have n^2 elements, where n is the number of elements in 'x'.");
-        return NULL;
-    }
-    R* x = (R*)PyMem_Malloc(x_len * sizeof(R));
-    R* p = (R*)PyMem_Malloc((p_len + 1) * sizeof(R));
-
-    if (!x || !p) {
-        PyErr_NoMemory();
-        if (x) PyMem_Free(x);
-        if (p) PyMem_Free(p);
-        return NULL;
-    }
-
-    if (pysequence_to_R_array(x_obj, "x", x, x_len) < 0) { // pysequence_to_R_array returns -1 on error
-        PyMem_Free(x);
-        PyMem_Free(p);
-        return NULL; // Error already set by pysequence_to_R_array
-    }
-    
-    // Store n (dimension of x) as the first element of p
-    // Ensure N can hold x_len. If N is uint, check x_len not too large.
-    ((N*)p)[0] = (N)x_len; 
-    
-    // Populate p_arr + 1 with the contents of p_obj
-    if (pysequence_to_R_array(p_obj, "p", p + 1, p_len) < 0) {
-        PyMem_Free(x);
-        PyMem_Free(p);
-        return NULL; // Error already set by pysequence_to_R_array
-    }
-
-    OdeObjectPy *ode_obj = (OdeObjectPy *)OdeTypePy.tp_alloc(&OdeTypePy, 0);
-    if (!ode_obj) { // tp_alloc sets error
-        PyMem_Free(x);
-        PyMem_Free(p);
-        return NULL;
-    }
-    // ode_obj->c_ode is NULL from OdeObjectPy_new
-
-    ode_obj->c_ode = (ode_t*)PyMem_Malloc(sizeof(ode_t));
-    if (!ode_obj->c_ode) {
-        PyErr_NoMemory();
-        Py_DECREF(ode_obj); // DECREF the Python wrapper
-        PyMem_Free(x);
-        PyMem_Free(p);
-        return NULL;
-    }
-    ode_t ode = {
-        .t = t,
-        .x = x,
-        .p = p,
-        .n = (N)x_len,
-        .fn = ode_linear
-    };
-    memcpy(ode_obj->c_ode, &ode, sizeof(ode_t));
-
-    return (PyObject *)ode_obj;
-}
-
+PyTypeObject OdeFactoryTypePy = {
+    PyVarObject_HEAD_INIT(NULL, 0)
+    .tp_name = "dynamical_systems.OdeFactory",
+    .tp_basicsize = sizeof(OdeFactoryObjectPy),
+    .tp_itemsize = 0,
+    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+    .tp_new = OdeFactoryObjectPy_new,
+    .tp_init = (initproc)OdeFactoryObjectPy_init,
+    .tp_dealloc = (destructor)OdeFactoryObjectPy_dealloc,
+    .tp_methods = OdeFactoryObjectPy_methods,
+    .tp_doc = "OdeFactory object wrapping a C ode_factory_t struct",
+};
 
 

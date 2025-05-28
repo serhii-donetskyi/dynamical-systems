@@ -5,13 +5,21 @@
 #include "structmember.h"
 #include "core/ode.h"
 
+// Python wrapper for ode_output_t
 typedef struct {
     PyObject_HEAD
-    ode_t *c_ode;
+    ode_output_t *output;  // Pointer to the C ode_output_t struct
+    void *handle;  // Pointer to the C handle
+} OdeFactoryObjectPy;
+
+// Python wrapper for ode_t
+typedef struct {
+    PyObject_HEAD
+    OdeFactoryObjectPy *factory;  // Pointer to the C OdeFactoryObjectPy struct
+    ode_t *ode;  // Pointer to the C ode_t struct
 } OdeObjectPy;
 
 extern PyTypeObject OdeTypePy;
-
-PyObject* py_create_ode_linear(PyObject *self_module, PyObject *args, PyObject *kwds);
+extern PyTypeObject OdeFactoryTypePy;
 
 #endif // PY_ODE_H 
