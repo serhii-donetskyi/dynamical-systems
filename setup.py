@@ -5,7 +5,12 @@ from setuptools import setup, Extension
 # that are then re-exported by a Python package (__init__.py).
 module = Extension(
     'dynamical_systems',
-    sources=['src/python.c', 'src/py_ode.c'],
+    sources=[
+        'src/py_common.c',
+        'src/py_ode.c',
+        'src/py_solver.c',
+        'src/python.c',
+    ],
     include_dirs=['src'],
     # Uncomment for more warnings during development:
     extra_compile_args=["-std=c11", "-Wall", "-Wextra", "-Werror", "-pedantic", "-O3", "-ffast-math"],
