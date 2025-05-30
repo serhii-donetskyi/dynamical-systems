@@ -3,15 +3,22 @@
 
 #include <Python.h>
 #include "structmember.h"
-#include "core/solver.h"
+#include "core.h"
+
+// Solver
+typedef struct {
+    PyObject_HEAD
+    solver_output_t *output;
+    void* handle;
+} SolverFactoryObjectPy;
 
 typedef struct {
     PyObject_HEAD
-    solver_t *c_solver;
+    PyObject *name;
+    solver_t *solver;
 } SolverObjectPy;
 
+extern PyTypeObject SolverFactoryTypePy;
 extern PyTypeObject SolverTypePy;
-
-PyObject* py_create_solver_rk4(PyObject *self_module, PyObject *args, PyObject *kwds);
 
 #endif // PY_SOLVER_H

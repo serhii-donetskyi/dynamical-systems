@@ -1,4 +1,6 @@
+#include "py_common.h"
 #include "py_ode.h"
+#include "py_solver.h"
 
 // --- Method Table ---
 static PyMethodDef dynamical_systems_methods[] = {
@@ -20,6 +22,8 @@ PyMODINIT_FUNC PyInit_dynamical_systems(void) {
 
     if (PyType_Ready(&OdeTypePy) < 0) return NULL;
     if (PyType_Ready(&OdeFactoryTypePy) < 0) return NULL;
+    if (PyType_Ready(&SolverTypePy) < 0) return NULL;
+    if (PyType_Ready(&SolverFactoryTypePy) < 0) return NULL;
 
     m = PyModule_Create(&dynamical_systems_module_def);
     if (m == NULL) return NULL;
@@ -39,20 +43,32 @@ PyMODINIT_FUNC PyInit_dynamical_systems(void) {
         return NULL;
     }
 
+    Py_INCREF(&SolverTypePy);
+    if (PyModule_AddObject(m, "Solver", (PyObject *)&SolverTypePy) < 0) {
+        Py_DECREF(&SolverTypePy);
+        Py_DECREF(&OdeFactoryTypePy);
+        Py_DECREF(&OdeTypePy);
+        Py_DECREF(m);
+        return NULL;
+    }
+
+    Py_INCREF(&SolverFactoryTypePy);
+    if (PyModule_AddObject(m, "SolverFactory", (PyObject *)&SolverFactoryTypePy) < 0) {
+        Py_DECREF(&SolverFactoryTypePy);
+        Py_DECREF(&SolverTypePy);
+        Py_DECREF(&OdeFactoryTypePy);
+        Py_DECREF(&OdeTypePy);
+        Py_DECREF(m);
+        return NULL;
+    }
+    
     // Add parameter type constants
-    if (PyModule_AddStringConstant(m, "NATURAL", "NATURAL") < 0) {
-        Py_DECREF(&OdeFactoryTypePy);
-        Py_DECREF(&OdeTypePy);
-        Py_DECREF(m);
-        return NULL;
-    }
-    if (PyModule_AddStringConstant(m, "INTEGER", "INTEGER") < 0) {
-        Py_DECREF(&OdeFactoryTypePy);
-        Py_DECREF(&OdeTypePy);
-        Py_DECREF(m);
-        return NULL;
-    }
-    if (PyModule_AddStringConstant(m, "REAL", "REAL") < 0) {
+    if (
+        PyModule_AddStringConstant(m, ARG_TYPE_NATURAL, ARG_TYPE_NATURAL) < 0 ||
+        PyModule_AddStringConstant(m, ARG_TYPE_INTEGER, ARG_TYPE_INTEGER) < 0 ||
+        PyModule_AddStringConstant(m, ARG_TYPE_REAL, ARG_TYPE_REAL) < 0 ||
+        PyModule_AddStringConstant(m, ARG_TYPE_STRING, ARG_TYPE_STRING) < 0
+    ) {
         Py_DECREF(&OdeFactoryTypePy);
         Py_DECREF(&OdeTypePy);
         Py_DECREF(m);

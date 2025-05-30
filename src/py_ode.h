@@ -3,7 +3,7 @@
 
 #include <Python.h>
 #include "structmember.h"
-#include "core/ode.h"
+#include "core.h"
 
 // Python wrapper for ode_output_t
 typedef struct {
@@ -17,6 +17,7 @@ typedef struct {
     PyObject_HEAD
     OdeFactoryObjectPy *factory;  // Pointer to the C OdeFactoryObjectPy struct
     ode_t *ode;  // Pointer to the C ode_t struct
+    PyObject *name;  // Python string name of the factory
 } OdeObjectPy;
 
 extern PyTypeObject OdeTypePy;
