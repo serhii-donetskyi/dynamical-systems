@@ -1,6 +1,7 @@
 #include "py_common.h"
 #include "py_ode.h"
 #include "py_solver.h"
+#include "py_job.h"
 
 // --- Method Table ---
 static PyMethodDef dynamical_systems_methods[] = {
@@ -24,6 +25,7 @@ PyMODINIT_FUNC PyInit_dynamical_systems(void) {
     if (PyType_Ready(&OdeFactoryTypePy) < 0) return NULL;
     if (PyType_Ready(&SolverTypePy) < 0) return NULL;
     if (PyType_Ready(&SolverFactoryTypePy) < 0) return NULL;
+    if (PyType_Ready(&JobTypePy) < 0) return NULL;
 
     m = PyModule_Create(&dynamical_systems_module_def);
     if (m == NULL) return NULL;
@@ -61,7 +63,17 @@ PyMODINIT_FUNC PyInit_dynamical_systems(void) {
         Py_DECREF(m);
         return NULL;
     }
-    
+
+    Py_INCREF(&JobTypePy);
+    if (PyModule_AddObject(m, "Job", (PyObject *)&JobTypePy) < 0) {
+        Py_DECREF(&JobTypePy);
+        Py_DECREF(&SolverTypePy);
+        Py_DECREF(&OdeFactoryTypePy);
+        Py_DECREF(&OdeTypePy);
+        Py_DECREF(m);
+        return NULL;
+    }
+
     // Add parameter type constants
     if (
         PyModule_AddStringConstant(m, ARG_TYPE_NATURAL, ARG_TYPE_NATURAL) < 0 ||

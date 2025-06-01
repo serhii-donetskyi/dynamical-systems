@@ -4,7 +4,7 @@ N data_size(const ode_t *restrict ode) {
     return ode->x_size * 5;
 }
 
-void step(ode_t *restrict ode, solver_t *restrict solver) {
+void step(ode_t *restrict ode, solver_t *restrict solver, R *restrict data) {
     const N n = ode->x_size;
     const R h = solver->args[0].r;
 
@@ -14,7 +14,7 @@ void step(ode_t *restrict ode, solver_t *restrict solver) {
     #define fn (ode->fn)
     #define args (ode->args)
 
-    #define y (solver->data)
+    #define y (data)
     #define k1 (y+n)
     #define k2 (k1+n)
     #define k3 (k2+n)

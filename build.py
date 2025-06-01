@@ -22,6 +22,8 @@ def main():
         shared_libs.append(cpp)
     for cpp in walk(os.path.join(current_dir, "src/solver")):
         shared_libs.append(cpp)
+    for cpp in walk(os.path.join(current_dir, "src/job")):
+        shared_libs.append(cpp)
     try:
         for cpp in shared_libs:
             subprocess.run(

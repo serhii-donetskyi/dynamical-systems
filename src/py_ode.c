@@ -52,7 +52,22 @@ static PyObject *OdeObjectPy_get_arguments(OdeObjectPy *self, PyObject *Py_UNUSE
         PyErr_SetString(PyExc_RuntimeError, "Invalid ode");
         return NULL;
     }
-    return get_dict_from_args(self->ode->args, 0);
+    N arg_size = 0;
+    while (self->ode->args[arg_size].name) arg_size++;
+    
+    // Create type string and arrays
+    char types[arg_size + 1];
+    const char* names[arg_size];
+    const void* src[arg_size];
+    
+    for (N i = 0; i < arg_size; i++) {
+        types[i] = (char)self->ode->args[i].type;
+        names[i] = self->ode->args[i].name;
+        src[i] = &self->ode->args[i].i;
+    }
+    types[arg_size] = '\0';
+    
+    return py_get_dict_from_args(types, names, src);
 }
 
 static PyObject *OdeObjectPy_get_x_size(OdeObjectPy *self, PyObject *Py_UNUSED(ignored)) {
@@ -69,6 +84,96 @@ static PyObject *OdeObjectPy_get_p_size(OdeObjectPy *self, PyObject *Py_UNUSED(i
         return NULL;
     }
     return PyLong_FromLong(self->ode->p_size);
+}
+
+static PyObject *OdeObjectPy_get_t(OdeObjectPy *self, PyObject *Py_UNUSED(ignored)) {
+    if (!self->ode) {
+        PyErr_SetString(PyExc_RuntimeError, "Invalid ode");
+        return NULL;
+    }
+    return PyFloat_FromDouble(self->ode->t);
+}
+
+static PyObject *OdeObjectPy_set_t(OdeObjectPy *self, PyObject *args, PyObject *kwargs) {
+    if (!self->ode) {
+        PyErr_SetString(PyExc_RuntimeError, "Invalid ode");
+        return NULL;
+    }
+    char *kwlist[] = {"value", NULL};
+    R value = 0;
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "d", kwlist, &value)) {
+        return NULL;
+    }
+    self->ode->t = value;
+    Py_RETURN_NONE;
+}
+
+static PyObject *OdeObjectPy_get_x(OdeObjectPy *self, PyObject *Py_UNUSED(ignored)) {
+    if (!self->ode) {
+        PyErr_SetString(PyExc_RuntimeError, "Invalid ode");
+        return NULL;
+    }
+    PyObject *list = PyList_New(self->ode->x_size); 
+    for (N i = 0; i < self->ode->x_size; i++) {
+        if (PyList_SetItem(list, i, PyFloat_FromDouble(self->ode->x[i])) < 0) {
+            Py_DECREF(list);
+            return NULL;
+        }
+    }
+    return list;
+}
+
+static PyObject *OdeObjectPy_set_x(OdeObjectPy *self, PyObject *args, PyObject *kwargs) {
+    if (!self->ode) {
+        PyErr_SetString(PyExc_RuntimeError, "Invalid ode");
+        return NULL;
+    }
+    char *kwlist[] = {"index", "value", NULL};
+    N index = 0;
+    R value = 0;
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "kd", kwlist, &index, &value)) {
+        return NULL;
+    }
+    if (index >= self->ode->x_size) {
+        PyErr_Format(PyExc_IndexError, "Index %d must be between 0 and %d", index, self->ode->x_size - 1);
+        return NULL;
+    }
+    self->ode->x[index] = value;
+    Py_RETURN_NONE;
+}
+
+static PyObject *OdeObjectPy_get_p(OdeObjectPy *self, PyObject *Py_UNUSED(ignored)) {
+    if (!self->ode) {
+        PyErr_SetString(PyExc_RuntimeError, "Invalid ode");
+        return NULL;
+    }
+    PyObject *list = PyList_New(self->ode->p_size);
+    for (N i = 0; i < self->ode->p_size; i++) {
+        if (PyList_SetItem(list, i, PyFloat_FromDouble(self->ode->p[i])) < 0) {
+            Py_DECREF(list);
+            return NULL;
+        }
+    }
+    return list;
+}
+
+static PyObject *OdeObjectPy_set_p(OdeObjectPy *self, PyObject *args, PyObject *kwargs) {
+    if (!self->ode) {
+        PyErr_SetString(PyExc_RuntimeError, "Invalid ode");
+        return NULL;
+    }
+    char *kwlist[] = {"index", "value", NULL};
+    N index = 0;
+    R value = 0;
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "kd", kwlist, &index, &value)) {
+        return NULL;
+    }
+    if (index >= self->ode->p_size) {
+        PyErr_Format(PyExc_IndexError, "Index %d must be between 0 and %d", index, self->ode->p_size - 1);
+        return NULL;
+    }
+    self->ode->p[index] = value;
+    Py_RETURN_NONE;
 }
 
 // OdeFactoryObjectPy implementation
@@ -124,8 +229,20 @@ static PyObject *OdeFactoryObjectPy_create_ode(OdeFactoryObjectPy *self, PyObjec
     }
 
     // Count number of arguments
-    I arg_size = parse_args(args, kwargs, self->output->args);
-    if (arg_size < 0) return NULL;
+    N arg_size = 0;
+    while (self->output->args[arg_size].name) arg_size++;
+    char types[arg_size + 1];
+    const char* names[arg_size];
+    void* dest[arg_size];
+    for (N i = 0; i < arg_size; i++) {
+        types[i] = (char)self->output->args[i].type;
+        names[i] = self->output->args[i].name;
+        dest[i] = &self->output->args[i].i;
+    }
+    types[arg_size] = '\0';
+    if (!py_parse_args(args, kwargs, types, names, dest)){
+        return NULL;
+    }
 
     // Create ODE object
     OdeObjectPy *py_ode = (OdeObjectPy *)OdeTypePy.tp_alloc(&OdeTypePy, 0);
@@ -138,7 +255,7 @@ static PyObject *OdeFactoryObjectPy_create_ode(OdeFactoryObjectPy *self, PyObjec
     R *p = PyMem_Malloc(sizeof(R) * p_size);
     argument_t *_args = PyMem_Malloc(sizeof(argument_t) * (arg_size + 1));
 
-    if (!py_ode || !ode || !x_size || !x || (p_size > 0 && !p_size) || (arg_size > 0 && !arg_size)) {
+    if (!py_ode || !ode || !x_size || !x || (p_size > 0 && !p_size) || !arg_size) {
         if (x_size == 0){
             PyErr_Format(PyExc_RuntimeError, "Failed to create ODE: x_size is 0");
         } else {
@@ -174,7 +291,16 @@ static PyObject *OdeFactoryObjectPy_get_argument_types(OdeFactoryObjectPy *self,
         PyErr_SetString(PyExc_RuntimeError, "Invalid output or arguments");
         return NULL;
     }
-    return get_dict_from_args(self->output->args, 1);
+    N arg_size = 0;
+    while (self->output->args[arg_size].name) arg_size++;
+    char types[arg_size + 1];
+    const char *names[arg_size];
+    for (N i = 0; i < arg_size; i++) {
+        types[i] = (char)self->output->args[i].type;
+        names[i] = self->output->args[i].name;
+    }
+    types[arg_size] = '\0';
+    return py_get_dict_from_args(types, names, NULL);
 }
 
 // Method tables
@@ -183,6 +309,12 @@ static PyMethodDef OdeObjectPy_methods[] = {
     {"get_arguments", (PyCFunction)OdeObjectPy_get_arguments, METH_NOARGS, "Get arguments of the ODE."},
     {"get_x_size", (PyCFunction)OdeObjectPy_get_x_size, METH_NOARGS, "Get x_size of the ODE."},
     {"get_p_size", (PyCFunction)OdeObjectPy_get_p_size, METH_NOARGS, "Get p_size of the ODE."},
+    {"get_t", (PyCFunction)OdeObjectPy_get_t, METH_NOARGS, "Get t of the ODE."},
+    {"set_t", (PyCFunction)(void(*)(void))OdeObjectPy_set_t, METH_VARARGS | METH_KEYWORDS, "Set t of the ODE."},
+    {"get_x", (PyCFunction)OdeObjectPy_get_x, METH_NOARGS, "Get x of the ODE."},
+    {"set_x", (PyCFunction)(void(*)(void))OdeObjectPy_set_x, METH_VARARGS | METH_KEYWORDS, "Set x of the ODE."},
+    {"get_p", (PyCFunction)OdeObjectPy_get_p, METH_NOARGS, "Get p of the ODE."},
+    {"set_p", (PyCFunction)(void(*)(void))OdeObjectPy_set_p, METH_VARARGS | METH_KEYWORDS, "Set p of the ODE."},
     {NULL, NULL, 0, NULL}  /* Sentinel */
 };
 

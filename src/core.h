@@ -8,10 +8,10 @@ typedef double R;
 typedef struct argument_t {
     const char * const name;
     const enum {
-        NATURAL = 0,
-        INTEGER = 1,
-        REAL = 2,
-        STRING = 3,
+        NATURAL = 'n',
+        INTEGER = 'i',
+        REAL = 'r',
+        STRING = 's',
     } type;
     union {
         N n;
@@ -51,10 +51,9 @@ typedef struct ode_output_t {
 struct solver_t;
 
 typedef N (*solver_data_size_fn)(const ode_t *restrict ode);
-typedef void (*solver_step_fn)(ode_t *restrict ode, struct solver_t *restrict solver);
+typedef void (*solver_step_fn)(ode_t *restrict ode, struct solver_t *restrict solver, R *restrict data);
 
 typedef struct solver_t {
-    R* data;
     const argument_t *const args;
     const solver_data_size_fn data_size;
     const solver_step_fn step;
@@ -70,7 +69,7 @@ typedef struct solver_output_t {
 
 
 // Job
-typedef I (*job_fn)(ode_t *restrict ode, solver_t *restrict solver, const argument_t *restrict args);
+typedef const char* (*job_fn)(ode_t *restrict ode, solver_t *restrict solver, R *restrict data, const argument_t *restrict args);
 
 typedef struct job_output_t {
     const char *const name;
