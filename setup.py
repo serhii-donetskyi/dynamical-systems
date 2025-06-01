@@ -9,6 +9,7 @@ module = Extension(
         'src/py_common.c',
         'src/py_ode.c',
         'src/py_solver.c',
+        'src/py_job.c',
         'src/python.c',
     ],
     include_dirs=['src'],
