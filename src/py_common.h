@@ -4,12 +4,6 @@
 #include <Python.h>
 #include "core.h"
 
-extern const char *ARG_TYPE_NATURAL;
-extern const char *ARG_TYPE_INTEGER;
-extern const char *ARG_TYPE_REAL;
-extern const char *ARG_TYPE_STRING;
-extern const char *ARG_TYPE_ODE;
-extern const char *ARG_TYPE_SOLVER;
 
 // Parses the arguments and returns a dictionary of the arguments, or NULL on error
 // types: a string of types, one for each argument

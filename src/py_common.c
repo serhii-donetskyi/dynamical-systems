@@ -4,13 +4,6 @@
 #include "core.h"
 #include <Python.h>
 
-const char *ARG_TYPE_NATURAL = "NATURAL";
-const char *ARG_TYPE_INTEGER = "INTEGER";
-const char *ARG_TYPE_REAL = "REAL";
-const char *ARG_TYPE_STRING = "STRING";
-const char *ARG_TYPE_ODE = "ODE";
-const char *ARG_TYPE_SOLVER = "SOLVER";
-
 PyObject *py_parse_args(PyObject *args, PyObject *kwargs, const char *types, const char *const *names, void **dest) {
     if (!types || !names || !dest) {
         PyErr_SetString(PyExc_ValueError, "Invalid arguments to py_parse_args");
@@ -44,9 +37,14 @@ PyObject *py_parse_args(PyObject *args, PyObject *kwargs, const char *types, con
         switch (types[i]) {
             case 'n':
                 if (PyLong_Check(arg)) {
-                    *((N*)dest[i]) = PyLong_AsUnsignedLong(arg);
+                    I value = PyLong_AsLong(arg);
+                    if (value < 0) {
+                        PyErr_Format(PyExc_TypeError, "Argument '%s' must be a non-negative integer", names[i]);
+                        return NULL;
+                    }
+                    *((N*)dest[i]) = (N)value;
                 } else {
-                    PyErr_Format(PyExc_TypeError, "Argument '%s' must be an integer", names[i]);
+                    PyErr_Format(PyExc_TypeError, "Argument '%s' must be a non-negative integer", names[i]);
                     return NULL;
                 }
                 break;
@@ -116,16 +114,36 @@ PyObject *py_get_dict_from_args(const char *types, const char *const *names, con
         PyObject *value = NULL;
         switch (types[i]) {
             case 'n':
-                value = src ? PyLong_FromUnsignedLong(*((N *)src[i])) : PyUnicode_FromString(ARG_TYPE_NATURAL);
+                if (src) {
+                    value = PyLong_FromUnsignedLong(*((N *)src[i]));
+                } else {
+                    value = (PyObject *)&PyLong_Type;
+                    Py_INCREF(value);
+                }
                 break;
             case 'i':
-                value = src ? PyLong_FromLong(*((I *)src[i])) : PyUnicode_FromString(ARG_TYPE_INTEGER);
+                if (src) {
+                    value = PyLong_FromLong(*((I *)src[i]));
+                } else {
+                    value = (PyObject *)&PyLong_Type;
+                    Py_INCREF(value);
+                }
                 break;
             case 'r':
-                value = src ? PyFloat_FromDouble(*((R *)src[i])) : PyUnicode_FromString(ARG_TYPE_REAL);
+                if (src) {
+                    value = PyFloat_FromDouble(*((R *)src[i]));
+                } else {
+                    value = (PyObject *)&PyFloat_Type;
+                    Py_INCREF(value);
+                }
                 break;
             case 's':
-                value = src ? PyUnicode_FromString(*((char **)src[i])) : PyUnicode_FromString(ARG_TYPE_STRING);
+                if (src) {
+                    value = PyUnicode_FromString(*((char **)src[i]));
+                } else {
+                    value = (PyObject *)&PyUnicode_Type;
+                    Py_INCREF(value);
+                }
                 break;
             case 'O':
                 if (src) {
@@ -139,7 +157,8 @@ PyObject *py_get_dict_from_args(const char *types, const char *const *names, con
                         }
                     }
                 } else {
-                    value = PyUnicode_FromString(ARG_TYPE_ODE);
+                    value = (PyObject *)&OdeTypePy;
+                    Py_INCREF(value);
                 }
                 break;
             case 'S':
@@ -154,7 +173,8 @@ PyObject *py_get_dict_from_args(const char *types, const char *const *names, con
                         }
                     }
                 } else {
-                    value = PyUnicode_FromString(ARG_TYPE_SOLVER);
+                    value = (PyObject *)&SolverTypePy;
+                    Py_INCREF(value);
                 }
                 break;
             default:

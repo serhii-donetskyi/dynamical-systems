@@ -73,19 +73,5 @@ PyMODINIT_FUNC PyInit_dynamical_systems(void) {
         Py_DECREF(m);
         return NULL;
     }
-
-    // Add parameter type constants
-    if (
-        PyModule_AddStringConstant(m, ARG_TYPE_NATURAL, ARG_TYPE_NATURAL) < 0 ||
-        PyModule_AddStringConstant(m, ARG_TYPE_INTEGER, ARG_TYPE_INTEGER) < 0 ||
-        PyModule_AddStringConstant(m, ARG_TYPE_REAL, ARG_TYPE_REAL) < 0 ||
-        PyModule_AddStringConstant(m, ARG_TYPE_STRING, ARG_TYPE_STRING) < 0
-    ) {
-        Py_DECREF(&OdeFactoryTypePy);
-        Py_DECREF(&OdeTypePy);
-        Py_DECREF(m);
-        return NULL;
-    }
-
     return m;
 }
