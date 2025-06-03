@@ -11,14 +11,14 @@ static PyMethodDef dynamical_systems_methods[] = {
 // --- Module Definition & Initialization ---
 static PyModuleDef dynamical_systems_module_def = {
     PyModuleDef_HEAD_INIT,
-    "dynamical_systems",
+    "_dynamical_systems",
     "Python interface for dynamical_systems C library ODE components.",
     -1,
     dynamical_systems_methods,
     NULL, NULL, NULL, NULL
 };
 
-PyMODINIT_FUNC PyInit_dynamical_systems(void) {
+PyMODINIT_FUNC PyInit__dynamical_systems(void) {
     PyObject *m;
 
     if (PyType_Ready(&OdeTypePy) < 0) return NULL;
