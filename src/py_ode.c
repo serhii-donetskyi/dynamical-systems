@@ -52,7 +52,7 @@ static PyObject *OdeObjectPy_get_arguments(OdeObjectPy *self, PyObject *Py_UNUSE
         PyErr_SetString(PyExc_RuntimeError, "Invalid ode");
         return NULL;
     }
-    N arg_size = 0;
+    I arg_size = 0;
     while (self->ode->args[arg_size].name) arg_size++;
     
     // Create type string and arrays
@@ -60,7 +60,7 @@ static PyObject *OdeObjectPy_get_arguments(OdeObjectPy *self, PyObject *Py_UNUSE
     const char* names[arg_size];
     const void* src[arg_size];
     
-    for (N i = 0; i < arg_size; i++) {
+    for (I i = 0; i < arg_size; i++) {
         types[i] = (char)self->ode->args[i].type;
         names[i] = self->ode->args[i].name;
         src[i] = &self->ode->args[i].i;
@@ -114,7 +114,7 @@ static PyObject *OdeObjectPy_get_x(OdeObjectPy *self, PyObject *Py_UNUSED(ignore
         return NULL;
     }
     PyObject *list = PyList_New(self->ode->x_size); 
-    for (N i = 0; i < self->ode->x_size; i++) {
+    for (I i = 0; i < self->ode->x_size; i++) {
         if (PyList_SetItem(list, i, PyFloat_FromDouble(self->ode->x[i])) < 0) {
             Py_DECREF(list);
             return NULL;
@@ -129,7 +129,7 @@ static PyObject *OdeObjectPy_set_x(OdeObjectPy *self, PyObject *args, PyObject *
         return NULL;
     }
     char *kwlist[] = {"index", "value", NULL};
-    N index = 0;
+    I index = 0;
     R value = 0;
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "kd", kwlist, &index, &value)) {
         return NULL;
@@ -148,7 +148,7 @@ static PyObject *OdeObjectPy_get_p(OdeObjectPy *self, PyObject *Py_UNUSED(ignore
         return NULL;
     }
     PyObject *list = PyList_New(self->ode->p_size);
-    for (N i = 0; i < self->ode->p_size; i++) {
+    for (I i = 0; i < self->ode->p_size; i++) {
         if (PyList_SetItem(list, i, PyFloat_FromDouble(self->ode->p[i])) < 0) {
             Py_DECREF(list);
             return NULL;
@@ -163,7 +163,7 @@ static PyObject *OdeObjectPy_set_p(OdeObjectPy *self, PyObject *args, PyObject *
         return NULL;
     }
     char *kwlist[] = {"index", "value", NULL};
-    N index = 0;
+    I index = 0;
     R value = 0;
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "kd", kwlist, &index, &value)) {
         return NULL;
@@ -223,18 +223,19 @@ static void OdeFactoryObjectPy_dealloc(OdeFactoryObjectPy *self) {
 // Factory method to create an OdeObjectPy
 static PyObject *OdeFactoryObjectPy_create_ode(OdeFactoryObjectPy *self, PyObject *args, PyObject *kwargs) {
     if (!self->output || !self->output->name || !self->output->x_size || 
-        !self->output->p_size || !self->output->fn || !self->output->args) {
+        !self->output->p_size || !self->output->fn || !self->output->args ||
+        !self->output->validate) {
         PyErr_SetString(PyExc_RuntimeError, "Invalid factory state");
         return NULL;
     }
 
     // Count number of arguments
-    N arg_size = 0;
+    I arg_size = 0;
     while (self->output->args[arg_size].name) arg_size++;
     char types[arg_size + 1];
     const char* names[arg_size];
     void* dest[arg_size];
-    for (N i = 0; i < arg_size; i++) {
+    for (I i = 0; i < arg_size; i++) {
         types[i] = (char)self->output->args[i].type;
         names[i] = self->output->args[i].name;
         dest[i] = &self->output->args[i].i;
@@ -243,14 +244,20 @@ static PyObject *OdeFactoryObjectPy_create_ode(OdeFactoryObjectPy *self, PyObjec
     if (!py_parse_args(args, kwargs, types, names, dest)){
         return NULL;
     }
+    
+    const char* error = self->output->validate(self->output->args);
+    if (error) {
+        PyErr_SetString(PyExc_RuntimeError, error);
+        return NULL;
+    }
 
     // Create ODE object
     OdeObjectPy *py_ode = (OdeObjectPy *)OdeTypePy.tp_alloc(&OdeTypePy, 0);
     py_ode->name = PyUnicode_FromString(self->output->name);
     // Allocate and initialize ODE structure
     ode_t *ode = PyMem_Malloc(sizeof(ode_t));
-    N x_size = self->output->x_size(self->output->args);
-    N p_size = self->output->p_size(self->output->args);
+    I x_size = self->output->x_size(self->output->args);
+    I p_size = self->output->p_size(self->output->args);
     R *x = PyMem_Malloc(sizeof(R) * x_size);
     R *p = PyMem_Malloc(sizeof(R) * p_size);
     argument_t *_args = PyMem_Malloc(sizeof(argument_t) * (arg_size + 1));
@@ -291,11 +298,11 @@ static PyObject *OdeFactoryObjectPy_get_argument_types(OdeFactoryObjectPy *self,
         PyErr_SetString(PyExc_RuntimeError, "Invalid output or arguments");
         return NULL;
     }
-    N arg_size = 0;
+    I arg_size = 0;
     while (self->output->args[arg_size].name) arg_size++;
     char types[arg_size + 1];
     const char *names[arg_size];
-    for (N i = 0; i < arg_size; i++) {
+    for (I i = 0; i < arg_size; i++) {
         types[i] = (char)self->output->args[i].type;
         names[i] = self->output->args[i].name;
     }

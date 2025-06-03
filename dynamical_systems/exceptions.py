@@ -17,3 +17,7 @@ class SolverError(DynamicalSystemsError):
 class ODEError(DynamicalSystemsError):
     """Error in ODE operations."""
     pass
+
+class JobError(DynamicalSystemsError):
+    """Error in job operations."""
+    pass

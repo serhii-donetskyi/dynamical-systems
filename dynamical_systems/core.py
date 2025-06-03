@@ -1,7 +1,7 @@
 import os
 from typing import Dict, Any, Optional, List
 from .exceptions import *
-from ._dynamical_systems import OdeFactory, SolverFactory, Job
+from ._dynamical_systems import OdeFactory, SolverFactory as _SolverFactory, Job as _Job
 
 class ODEFactory:
     """High-level wrapper for ODE factory."""
@@ -190,7 +190,7 @@ class SolverFactory:
             raise FactoryError(f"Library not found: {libpath}")
             
         try:
-            self._factory = SolverFactory(libpath=libpath)
+            self._factory = _SolverFactory(libpath=libpath)
         except RuntimeError as e:
             raise FactoryError(f"Failed to load solver library: {e}")
     
@@ -239,7 +239,7 @@ class Job:
             raise FactoryError(f"Library not found: {libpath}")
             
         try:
-            self._job = Job(libpath=libpath)
+            self._job = _Job(libpath=libpath)
         except RuntimeError as e:
             raise FactoryError(f"Failed to load job library: {e}")
     
@@ -248,18 +248,18 @@ class Job:
         try:
             return self._job.get_name()
         except RuntimeError as e:
-            raise SolverError(f"Failed to get name: {e}")
+            raise JobError(f"Failed to get name: {e}")
     
     @property
     def argument_types(self) -> Dict[str, str]:
         try:
             return self._job.get_argument_types()
         except RuntimeError as e:
-            raise FactoryError(f"Failed to get argument types: {e}")
+            raise JobError(f"Failed to get argument types: {e}")
     
     def run(self, ode: ODE, solver: Solver, **kwargs):
         """Run the job with given ODE and solver."""
         try:
             return self._job.run(ode=ode._ode, solver=solver._solver, **kwargs)
         except (TypeError, RuntimeError) as e:
-            raise SolverError(f"Job failed: {e}")
+            raise ArgumentError(f"Job failed: {e}")

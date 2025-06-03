@@ -65,7 +65,7 @@ static PyObject *JobObjectPy_get_argument_types(JobObjectPy *self, PyObject *Py_
         PyErr_SetString(PyExc_RuntimeError, "Invalid output or arguments");
         return NULL;
     }
-    N arg_size = 0;
+    I arg_size = 0;
     while (self->output->args[arg_size].name) arg_size++;
     
     // Create type string and names array (including ode and solver)
@@ -77,7 +77,7 @@ static PyObject *JobObjectPy_get_argument_types(JobObjectPy *self, PyObject *Py_
     types[1] = 'S';
     names[1] = "solver";
     
-    for (N i = 0; i < arg_size; i++) {
+    for (I i = 0; i < arg_size; i++) {
         types[i+2] = (char)self->output->args[i].type;
         names[i+2] = self->output->args[i].name;
     }
@@ -96,7 +96,7 @@ static PyObject *JobObjectPy_run(JobObjectPy *self, PyObject *args, PyObject *kw
     PyObject *ode_obj = NULL;
     PyObject *solver_obj = NULL;
 
-    N arg_size = 0;
+    I arg_size = 0;
     while (self->output->args[arg_size].name) arg_size++;
     
     // Create type string and arrays (including ode and solver)
@@ -111,7 +111,7 @@ static PyObject *JobObjectPy_run(JobObjectPy *self, PyObject *args, PyObject *kw
     names[1] = "solver";
     dest[1] = &solver_obj;
     
-    for (N i = 0; i < arg_size; i++) {
+    for (I i = 0; i < arg_size; i++) {
         types[i+2] = (char)self->output->args[i].type;
         names[i+2] = self->output->args[i].name;
         dest[i+2] = &self->output->args[i].i;
@@ -131,7 +131,7 @@ static PyObject *JobObjectPy_run(JobObjectPy *self, PyObject *args, PyObject *kw
     }
 
     // Allocate data
-    N data_size = solver_py->solver->data_size(ode_py->ode);
+    I data_size = solver_py->solver->data_size(ode_py->ode);
     R *data = PyMem_Malloc(sizeof(R) * data_size);
     if (!data) {
         PyErr_SetString(PyExc_RuntimeError, "Failed to allocate data");

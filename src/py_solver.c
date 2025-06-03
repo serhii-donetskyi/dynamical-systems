@@ -50,12 +50,12 @@ static PyObject *SolverObjectPy_get_arguments(SolverObjectPy *self, PyObject *Py
         PyErr_SetString(PyExc_RuntimeError, "Invalid solver");
         return NULL;
     }
-    N arg_size = 0;
+    I arg_size = 0;
     while (self->solver->args[arg_size].name) arg_size++;
     char types[arg_size + 1];
     const char* names[arg_size];
     const void* src[arg_size];
-    for (N i = 0; i < arg_size; i++) {
+    for (I i = 0; i < arg_size; i++) {
         types[i] = (char)self->solver->args[i].type;
         names[i] = self->solver->args[i].name;
         src[i] = &self->solver->args[i].i;
@@ -112,17 +112,17 @@ static void SolverFactoryObjectPy_dealloc(SolverFactoryObjectPy *self) {
 // Factory method to create a SolverObjectPy
 static PyObject *SolverFactoryObjectPy_create_solver(SolverFactoryObjectPy *self, PyObject *args, PyObject *kwargs) {
     if (!self->output || !self->output->name || !self->output->data_size || 
-        !self->output->step || !self->output->args) {
+        !self->output->step || !self->output->args || !self->output->validate) {
         PyErr_SetString(PyExc_RuntimeError, "Invalid factory state");
         return NULL;
     }
 
-    N arg_size = 0;
+    I arg_size = 0;
     while (self->output->args[arg_size].name) arg_size++;
     char types[arg_size + 1];
     const char* names[arg_size];
     void* dest[arg_size];
-    for (N i = 0; i < arg_size; i++) {
+    for (I i = 0; i < arg_size; i++) {
         types[i] = (char)self->output->args[i].type;
         names[i] = self->output->args[i].name;
         dest[i] = &self->output->args[i].i;
@@ -130,6 +130,12 @@ static PyObject *SolverFactoryObjectPy_create_solver(SolverFactoryObjectPy *self
     types[arg_size] = '\0';
     
     if (!py_parse_args(args, kwargs, types, names, dest)){
+        return NULL;
+    }
+
+    const char* error = self->output->validate(self->output->args);
+    if (error) {
+        PyErr_SetString(PyExc_RuntimeError, error);
         return NULL;
     }
 
@@ -167,11 +173,11 @@ static PyObject *SolverFactoryObjectPy_get_argument_types(SolverFactoryObjectPy 
         PyErr_SetString(PyExc_RuntimeError, "Invalid output or arguments");
         return NULL;
     }
-    N arg_size = 0;
+    I arg_size = 0;
     while (self->output->args[arg_size].name) arg_size++;
     char types[arg_size + 1];
     const char* names[arg_size];
-    for (N i = 0; i < arg_size; i++) {
+    for (I i = 0; i < arg_size; i++) {
         types[i] = (char)self->output->args[i].type;
         names[i] = self->output->args[i].name;
     }

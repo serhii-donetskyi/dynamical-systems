@@ -21,7 +21,8 @@ def factory():
     return ODEFactory(lib_path())
 
 def test_ode(factory):
-    ode = factory.create(n=2)
+    kwargs = {'n': 2}
+    ode = factory.create(**kwargs)
     t = random.random()
     x = [random.random() for _ in range(ode.x_size)]
     p = [random.random() for _ in range(ode.p_size)]
@@ -34,6 +35,7 @@ def test_ode(factory):
     assert ode.t == t
     assert ode.x == x
     assert ode.p == p
+    assert ode.arguments == kwargs
 
 def test_errors(factory):
     with pytest.raises(ArgumentError):

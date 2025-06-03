@@ -35,19 +35,6 @@ PyObject *py_parse_args(PyObject *args, PyObject *kwargs, const char *types, con
         }
         
         switch (types[i]) {
-            case 'n':
-                if (PyLong_Check(arg)) {
-                    I value = PyLong_AsLong(arg);
-                    if (value < 0) {
-                        PyErr_Format(PyExc_TypeError, "Argument '%s' must be a non-negative integer", names[i]);
-                        return NULL;
-                    }
-                    *((N*)dest[i]) = (N)value;
-                } else {
-                    PyErr_Format(PyExc_TypeError, "Argument '%s' must be a non-negative integer", names[i]);
-                    return NULL;
-                }
-                break;
             case 'i':
                 if (PyLong_Check(arg)) {
                     *((I *)dest[i]) = PyLong_AsLong(arg);
@@ -113,14 +100,6 @@ PyObject *py_get_dict_from_args(const char *types, const char *const *names, con
         }
         PyObject *value = NULL;
         switch (types[i]) {
-            case 'n':
-                if (src) {
-                    value = PyLong_FromUnsignedLong(*((N *)src[i]));
-                } else {
-                    value = (PyObject *)&PyLong_Type;
-                    Py_INCREF(value);
-                }
-                break;
             case 'i':
                 if (src) {
                     value = PyLong_FromLong(*((I *)src[i]));
