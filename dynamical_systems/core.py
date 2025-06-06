@@ -1,7 +1,7 @@
 import os
 from typing import Dict, Any, Optional, List
-from .exceptions import *
 from ._dynamical_systems import OdeFactory, SolverFactory as _SolverFactory, Job as _Job
+
 
 class ODEFactory:
     """High-level wrapper for ODE factory."""
@@ -16,20 +16,14 @@ class ODEFactory:
             FactoryError: If library cannot be loaded
         """
         if not os.path.exists(libpath):
-            raise FactoryError(f"Library not found: {libpath}")
+            raise ValueError(f"Library not found: {libpath}")
             
-        try:
-            self._factory = OdeFactory(libpath=libpath)
-        except RuntimeError as e:
-            raise FactoryError(f"Failed to load ODE library: {e}")
+        self._factory = OdeFactory(libpath=libpath)
     
     @property
     def argument_types(self) -> Dict[str, str]:
         """Get required argument types for this ODE."""
-        try:
-            return self._factory.get_argument_types()
-        except RuntimeError as e:
-            raise FactoryError(f"Failed to get argument types: {e}")
+        return self._factory.get_argument_types()
     
     def create(self, **kwargs) -> 'ODE':
         """Create an ODE instance with given parameters.
@@ -46,11 +40,8 @@ class ODEFactory:
         # Validate arguments
         self._validate_arguments(kwargs)
         
-        try:
-            ode_obj = self._factory.create_ode(**kwargs)
-            return ODE(ode_obj)
-        except (TypeError, RuntimeError) as e:
-            raise ArgumentError(f"Failed to create ODE: {e}")
+        ode_obj = self._factory.create_ode(**kwargs)
+        return ODE(ode_obj)
     
     def _validate_arguments(self, kwargs: Dict[str, Any]):
         """Validate arguments against expected types."""
@@ -59,17 +50,17 @@ class ODEFactory:
         # Check for missing arguments
         missing = set(expected.keys()) - set(kwargs.keys())
         if missing:
-            raise ArgumentError(f"Missing required arguments: {missing}")
+            raise ValueError(f"Missing required arguments: {missing}")
         
         # Check for extra arguments
         extra = set(kwargs.keys()) - set(expected.keys())
         if extra:
-            raise ArgumentError(f"Unexpected arguments: {extra}")
+            raise ValueError(f"Unexpected arguments: {extra}")
         
         for name, value in kwargs.items():
             expected_type = expected[name]
             if not isinstance(value, expected_type):
-                raise ArgumentError(f"Argument '{name}' should be {expected_type}, got {type(value).__name__}")
+                raise ValueError(f"Argument '{name}' should be {expected_type}, got {type(value).__name__}")
         
 
 class ODE:
@@ -82,102 +73,65 @@ class ODE:
     @property
     def name(self) -> str:
         """Get ODE name."""
-        try:
-            return self._ode.get_name()
-        except RuntimeError as e:
-            raise ODEError(f"Failed to get name: {e}")
+        return self._ode.get_name()
     
     @property
     def arguments(self) -> Dict[str, Any]:
         """Get ODE arguments."""
-        try:
-            return self._ode.get_arguments()
-        except RuntimeError as e:
-            raise ODEError(f"Failed to get arguments: {e}")
+        return self._ode.get_arguments()
     
     @property
     def x_size(self) -> int:
         """Get state vector size."""
-        try:
-            return self._ode.get_x_size()
-        except RuntimeError as e:
-            raise ODEError(f"Failed to get x_size: {e}")
+        return self._ode.get_x_size()
     
     @property
     def p_size(self) -> int:
         """Get parameter vector size."""
-        try:
-            return self._ode.get_p_size()
-        except RuntimeError as e:
-            raise ODEError(f"Failed to get p_size: {e}")
+        return self._ode.get_p_size()
     
     @property
     def t(self) -> float:
         """Get current time."""
-        try:
-            return self._ode.get_t()
-        except RuntimeError as e:
-            raise ODEError(f"Failed to get time: {e}")
+        return self._ode.get_t()
     
     @t.setter
     def t(self, value: float):
         """Set current time."""
-        try:
-            self._ode.set_t(value=float(value))
-        except (TypeError, RuntimeError, ValueError) as e:
-            raise ODEError(f"Failed to set time: {e}")
+        self._ode.set_t(value=float(value))
     
     def set_x(self, index: int, value: float):
         """Set state vector component."""
-        if not 0 <= index < self.x_size:
-            raise ODEError(f"Index {index} out of range [0, {self.x_size})")
-        
-        try:
-            self._ode.set_x(index=index, value=float(value))
-        except (TypeError, RuntimeError, IndexError, ValueError) as e:
-            raise ODEError(f"Failed to set x[{index}]: {e}")
+        self._ode.set_x(index=index, value=float(value))
     
     @property
     def x(self) -> List[float]:
         """Get state vector."""
-        try:
-            return self._ode.get_x()
-        except RuntimeError as e:
-            raise ODEError(f"Failed to get state: {e}")
+        return self._ode.get_x()
 
     @x.setter
     def x(self, values: List[float]):
         """Set entire state vector."""
         if len(values) != self.x_size:
-            raise ODEError(f"State vector must have {self.x_size} elements, got {len(values)}")
+            raise ValueError(f"State vector must have {self.x_size} elements, got {len(values)}")
         
         for i, value in enumerate(values):
             self.set_x(i, value)
     
     def set_p(self, index: int, value: float):
         """Set parameter vector component."""
-        if not 0 <= index < self.p_size:
-            raise ODEError(f"Index {index} out of range [0, {self.p_size})")
-        
-        try:
-            self._ode.set_p(index=index, value=float(value))
-        except (TypeError, RuntimeError, IndexError, ValueError) as e:
-            raise ODEError(f"Failed to set p[{index}]: {e}")
+        self._ode.set_p(index=index, value=float(value))
     
     @property
     def p(self) -> List[float]:
         """Get parameter vector."""
-        try:
-            return self._ode.get_p()
-        except RuntimeError as e:
-            raise ODEError(f"Failed to get parameters: {e}")
+        return self._ode.get_p()
 
     @p.setter
     def p(self, values: List[float]):
         """Set entire parameter vector."""
         if len(values) != self.p_size:
-            raise ODEError(f"Parameter vector must have {self.p_size} elements, got {len(values)}")
-        
+            raise ValueError(f"Parameter vector must have {self.p_size} elements, got {len(values)}")
         for i, value in enumerate(values):
             self.set_p(i, value)
 
@@ -187,27 +141,17 @@ class SolverFactory:
     
     def __init__(self, libpath: str):
         if not os.path.exists(libpath):
-            raise FactoryError(f"Library not found: {libpath}")
-            
-        try:
-            self._factory = _SolverFactory(libpath=libpath)
-        except RuntimeError as e:
-            raise FactoryError(f"Failed to load solver library: {e}")
+            raise ValueError(f"Library not found: {libpath}")
+        self._factory = _SolverFactory(libpath=libpath)
     
     @property
     def argument_types(self) -> Dict[str, str]:
-        try:
-            return self._factory.get_argument_types()
-        except RuntimeError as e:
-            raise FactoryError(f"Failed to get argument types: {e}")
+        return self._factory.get_argument_types()
     
     def create(self, **kwargs) -> 'Solver':
         """Create a solver instance."""
-        try:
-            solver_obj = self._factory.create_solver(**kwargs)
-            return Solver(solver_obj)
-        except (TypeError, RuntimeError) as e:
-            raise ArgumentError(f"Failed to create solver: {e}")
+        solver_obj = self._factory.create_solver(**kwargs)
+        return Solver(solver_obj)
 
 
 class Solver:
@@ -218,17 +162,11 @@ class Solver:
     
     @property
     def name(self) -> str:
-        try:
-            return self._solver.get_name()
-        except RuntimeError as e:
-            raise SolverError(f"Failed to get name: {e}")
+        return self._solver.get_name()
     
     @property
     def arguments(self) -> Dict[str, Any]:
-        try:
-            return self._solver.get_arguments()
-        except RuntimeError as e:
-            raise SolverError(f"Failed to get arguments: {e}")
+        return self._solver.get_arguments()
 
 
 class Job:
@@ -236,30 +174,17 @@ class Job:
     
     def __init__(self, libpath: str):
         if not os.path.exists(libpath):
-            raise FactoryError(f"Library not found: {libpath}")
-            
-        try:
-            self._job = _Job(libpath=libpath)
-        except RuntimeError as e:
-            raise FactoryError(f"Failed to load job library: {e}")
+            raise ValueError(f"Library not found: {libpath}")
+        self._job = _Job(libpath=libpath)
     
     @property
     def name(self) -> str:
-        try:
-            return self._job.get_name()
-        except RuntimeError as e:
-            raise JobError(f"Failed to get name: {e}")
+        return self._job.get_name()
     
     @property
     def argument_types(self) -> Dict[str, str]:
-        try:
-            return self._job.get_argument_types()
-        except RuntimeError as e:
-            raise JobError(f"Failed to get argument types: {e}")
+        return self._job.get_argument_types()
     
     def run(self, ode: ODE, solver: Solver, **kwargs):
         """Run the job with given ODE and solver."""
-        try:
-            return self._job.run(ode=ode._ode, solver=solver._solver, **kwargs)
-        except (TypeError, RuntimeError) as e:
-            raise ArgumentError(f"Job failed: {e}")
+        return self._job.run(ode=ode._ode, solver=solver._solver, **kwargs)

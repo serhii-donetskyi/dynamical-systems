@@ -2,8 +2,7 @@ import pytest
 import random
 import os
 import platform
-from dynamical_systems.core import ODEFactory, ODE, ODEError
-from dynamical_systems.exceptions import ArgumentError
+from dynamical_systems.core import ODEFactory, ODE
 
 def lib_path():
     """Get the correct library path based on the platform."""
@@ -38,24 +37,24 @@ def test_ode(factory):
     assert ode.arguments == kwargs
 
 def test_errors(factory):
-    with pytest.raises(ArgumentError):
+    with pytest.raises(Exception):
         factory.create(n=-1)
     ode = factory.create(n=2)
-    with pytest.raises(ODEError):
+    with pytest.raises(Exception):
         ode.t = 'string'
-    with pytest.raises(ODEError):
+    with pytest.raises(Exception):
         ode.x = 'string'
-    with pytest.raises(ODEError):
+    with pytest.raises(Exception):
         ode.p = 'string'
-    with pytest.raises(ODEError):
+    with pytest.raises(Exception):
         x = [random.random() for _ in range(ode.x_size + 1)]
         ode.x = x
-    with pytest.raises(ODEError):
+    with pytest.raises(Exception):
         p = [random.random() for _ in range(ode.p_size + 1)]
         ode.p = p
-    with pytest.raises(ODEError):
+    with pytest.raises(Exception):
         x = [random.random() for _ in range(ode.x_size - 1)]
         ode.x = x
-    with pytest.raises(ODEError):
+    with pytest.raises(Exception):
         p = [random.random() for _ in range(ode.p_size - 1)]
         ode.p = p

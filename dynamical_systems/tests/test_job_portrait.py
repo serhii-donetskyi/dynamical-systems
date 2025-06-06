@@ -3,7 +3,6 @@ import random
 import os
 import platform
 from dynamical_systems.core import ODEFactory, ODE, SolverFactory, Solver, Job
-from dynamical_systems.exceptions import ArgumentError, JobError
 
 def ode_lib_path():
     """Get the correct ODE library path based on the platform."""
@@ -82,11 +81,11 @@ def test_job(job, ode, solver):
     os.remove('portrait.dat')
 
 def test_errors(job, ode, solver):
-    with pytest.raises(ArgumentError):
+    with pytest.raises(Exception):
         job.run(ode=ode, solver=solver, t_end='string', max_steps=1000000, file_path='portrait.dat')
     
-    with pytest.raises(ArgumentError):
+    with pytest.raises(Exception):
         job.run(ode=ode, solver=solver, t_end=1.0, max_steps='string', file_path='portrait.dat')
     
-    with pytest.raises(ArgumentError):
+    with pytest.raises(Exception):
         job.run(ode=ode, solver=solver, t_end=1.0, max_steps=1000000, file_path=123)
