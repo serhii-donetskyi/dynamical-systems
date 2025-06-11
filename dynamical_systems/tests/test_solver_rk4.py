@@ -2,7 +2,7 @@ import pytest
 import random
 import os
 import platform
-from dynamical_systems.core import SolverFactory, Solver
+from dynamical_systems import SolverFactory, Solver
 
 def lib_path():
     """Get the correct library path based on the platform."""
@@ -23,7 +23,7 @@ def test_solver(factory):
     kwargs = {'h': 0.01}
     solver = factory.create(**kwargs)
     assert isinstance(solver, Solver)
-    assert solver.arguments == kwargs
+    assert solver.get_arguments() == kwargs
 
 def test_rk4_errors(factory):
     with pytest.raises(Exception):

@@ -2,7 +2,7 @@ import pytest
 import random
 import os
 import platform
-from dynamical_systems.core import ODEFactory, ODE, SolverFactory, Solver, Job
+from dynamical_systems import OdeFactory, Ode, SolverFactory, Solver, Job
 
 def ode_lib_path():
     """Get the correct ODE library path based on the platform."""
@@ -39,7 +39,7 @@ def job_lib_path():
 
 @pytest.fixture
 def ode_factory():
-    return ODEFactory(ode_lib_path())
+    return OdeFactory(ode_lib_path())
 
 @pytest.fixture
 def solver_factory():
@@ -57,9 +57,11 @@ def ode(ode_factory):
     t = 0.0
     x = [0.0, -1.0]
     p = [0.0, 1.0, -1.0, 0.0]
-    ode.t = t
-    ode.x = x
-    ode.p = p
+    ode.set_t(t)
+    for i in range(len(x)):
+        ode.set_x(i, x[i])
+    for i in range(len(p)):
+        ode.set_p(i, p[i])
     return ode
 
 @pytest.fixture
