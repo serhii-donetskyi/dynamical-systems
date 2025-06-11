@@ -110,7 +110,7 @@ static void SolverFactoryObjectPy_dealloc(SolverFactoryObjectPy *self) {
 }
 
 // Factory method to create a SolverObjectPy
-static PyObject *SolverFactoryObjectPy_create_solver(SolverFactoryObjectPy *self, PyObject *args, PyObject *kwargs) {
+static PyObject *SolverFactoryObjectPy_create(SolverFactoryObjectPy *self, PyObject *args, PyObject *kwargs) {
     if (!self->output || !self->output->name || !self->output->data_size || 
         !self->output->step || !self->output->args || !self->output->validate) {
         PyErr_SetString(PyExc_RuntimeError, "Invalid factory state");
@@ -194,7 +194,7 @@ static PyMethodDef SolverObjectPy_methods[] = {
 };
 
 static PyMethodDef SolverFactoryObjectPy_methods[] = {
-    {"create_solver", (PyCFunction)(void(*)(void))SolverFactoryObjectPy_create_solver, METH_VARARGS | METH_KEYWORDS, "Create a new Solver instance."},
+    {"create", (PyCFunction)(void(*)(void))SolverFactoryObjectPy_create, METH_VARARGS | METH_KEYWORDS, "Create a new Solver instance."},
     {"get_argument_types", (PyCFunction)SolverFactoryObjectPy_get_argument_types, METH_NOARGS, "Return a dictionary mapping argument names to their types."},
     {NULL, NULL, 0, NULL}  /* Sentinel */
 };

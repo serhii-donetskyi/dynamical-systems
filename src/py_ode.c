@@ -221,7 +221,7 @@ static void OdeFactoryObjectPy_dealloc(OdeFactoryObjectPy *self) {
 }
 
 // Factory method to create an OdeObjectPy
-static PyObject *OdeFactoryObjectPy_create_ode(OdeFactoryObjectPy *self, PyObject *args, PyObject *kwargs) {
+static PyObject *OdeFactoryObjectPy_create(OdeFactoryObjectPy *self, PyObject *args, PyObject *kwargs) {
     if (!self->output || !self->output->name || !self->output->x_size || 
         !self->output->p_size || !self->output->fn || !self->output->args ||
         !self->output->validate) {
@@ -326,7 +326,7 @@ static PyMethodDef OdeObjectPy_methods[] = {
 };
 
 static PyMethodDef OdeFactoryObjectPy_methods[] = {
-    {"create_ode", (PyCFunction)(void(*)(void))OdeFactoryObjectPy_create_ode, METH_VARARGS | METH_KEYWORDS, "Create a new ODE instance."},
+    {"create", (PyCFunction)(void(*)(void))OdeFactoryObjectPy_create, METH_VARARGS | METH_KEYWORDS, "Create a new ODE instance."},
     {"get_argument_types", (PyCFunction)OdeFactoryObjectPy_get_argument_types, METH_NOARGS, "Return a dictionary mapping argument names to their types."},
     {NULL, NULL, 0, NULL}  /* Sentinel */
 };
