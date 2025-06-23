@@ -12,6 +12,20 @@ class DynamicalSystemsUI {
             job: {}
         };
 
+        this.fieldValidations = {
+            ode: {
+                args: {},
+                variables: {},
+                parameters: {}
+            },
+            solver: {
+                args: {}
+            },
+            job: {
+                args: {}
+            }
+        }
+
         this.components = {
             ode: {
                 dropdown: {
@@ -23,6 +37,11 @@ class DynamicalSystemsUI {
                         section: document.getElementById('ode-arguments-fields'),
                     },
                     apply: document.getElementById('ode-arguments-apply-btn')
+                },
+                state: {
+                    section: document.getElementById('ode-state'),
+                    variables: document.getElementById('ode-state-content-variables'),
+                    parameters: document.getElementById('ode-state-content-parameters')
                 }
             },
             solver: {
@@ -46,6 +65,9 @@ class DynamicalSystemsUI {
                         section: document.getElementById('job-arguments-fields'),
                     },
                 }
+            },
+            run: {
+                button: document.getElementById('run-btn')
             }
         }
         
@@ -66,7 +88,7 @@ class DynamicalSystemsUI {
             this.populateDropdown('job', jobs);
         } catch (error) {
             console.error('Error loading components:', error);
-            this.showError(`Failed to load components: ${error}`);
+            this.createPopUp(`Failed to load components: ${error}`, false);
         }
         
         // Dropdown change listeners
@@ -81,12 +103,36 @@ class DynamicalSystemsUI {
         this.components.job.dropdown.select.addEventListener('change', (e) => {
             this.generateArgumentFields('job', e.target.value);
         });
+
+        this.components.ode.arguments.apply.addEventListener('click', () => {
+            this.components.ode.arguments.apply.disabled = true;
+            this.generateStateFields();
+        });
+
+        this.components.run.button.addEventListener('click', () => {
+            this.runSimulation();
+        });
     }
     
-    async fetchAPI(url) {
-        const response = await fetch(url);
+    async fetchAPI(url, options = {}) {
+        const config = {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            ...options
+        };
+
+        // If there's a body, stringify it
+        if (config.body && typeof config.body === 'object') {
+            config.body = JSON.stringify(config.body);
+        }
+
+        const response = await fetch(url, config);
         if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+            const errorData = await response.json();
+            const errorMessage = errorData.error || errorData.message || errorData.detail;
+            throw errorMessage;
         }
         return await response.json();
     }
@@ -97,7 +143,6 @@ class DynamicalSystemsUI {
             select.removeChild(select.lastChild);
         }
         options.forEach(option => {
-            console.log(option);
             const optionElement = document.createElement('option');
             optionElement.value = option;
             optionElement.textContent = option;
@@ -108,8 +153,17 @@ class DynamicalSystemsUI {
     async generateArgumentFields(componentType, componentName) {
         const section = this.components[componentType].arguments.section;
         if (!componentName) {
-            this.selectedComponents[componentType] = null;
+            // Hide state section if ODE is deselected
+            if (componentType === 'ode') {
+                this.components.ode.state.section.style.display = 'none';
+                this.components.ode.arguments.apply.disabled = true;
+                this.fieldValidations.ode.variables = {t: false};
+                this.fieldValidations.ode.parameters = {};
+            }
             section.style.display = 'none'; // Hide the section
+            this.selectedComponents[componentType] = null;
+            this.fieldValidations[componentType].args = {};
+            this.checkIfRunReady();
             return;
         }
         section.style.display = 'block'; // Show the section
@@ -118,16 +172,23 @@ class DynamicalSystemsUI {
         const id = fields.id;
         fields.innerHTML = '';
         
-        this.selectedComponents[componentType] = componentName;
-        if (!this.componentConfigs[componentType][componentName]) {
-            this.componentConfigs[componentType][componentName] = {args: {}};
+        const componentConfigJson = {
+            [componentType]: {
+                [componentName]: {
+                    args: {}
+                }
+            }
         }
-        const args = this.componentConfigs[componentType][componentName].args;
+        this.selectedComponents[componentType] = componentName;
+        this.componentConfigs = this.mergeJsons(componentConfigJson, this.componentConfigs);
+        this.fieldValidations[componentType].args = {};
+
+        const argValues = this.componentConfigs[componentType][componentName].args;
+        const argValidations = this.fieldValidations[componentType].args;
         
         try {
             const argumentTypes = await this.fetchAPI(`/api/get-${componentType}-arguments/${componentName}`);
-            
-            Object.entries(argumentTypes).forEach(([argName, argType]) => {
+            argumentTypes.forEach(({name: argName, type: argType}) => {
                 const fieldDiv = document.createElement('div');
                 fieldDiv.className = 'argument-field';
                 
@@ -140,30 +201,30 @@ class DynamicalSystemsUI {
                 input.className = 'argument-input';
                 input.id = `${id}-${argName}`;
                 input.name = `${id}-${argName}`;
-                if (!args[argName]) {
-                    args[argName] = {
-                        value: '',
-                        isValid: false
-                    };
+                if (!argValues[argName]) {
+                    argValues[argName] = ''
                 }
-                const arg = args[argName];
                 input.addEventListener('input', (e) => {
-                    arg.value = e.target.value;
-                    arg.isValid = this.isValidArgument(e.target.value, argType);
-                    if (arg.isValid) {
+                    argValues[argName] = e.target.value;
+                    argValidations[argName] = this.isValidField(e.target.value, argType);
+                    if (argValidations[argName]) {
                         input.classList.remove('invalid');
                     } else {
                         input.classList.add('invalid');
                     }
+                    if (componentType === 'ode') {
+                        const hasInvalidArgs = Object.values(argValidations).some(arg => !arg);
+                        this.components.ode.state.section.style.display = 'none';
+                        this.components.ode.arguments.apply.disabled = hasInvalidArgs;
+                        this.fieldValidations.ode.variables = {t: false};
+                        this.fieldValidations.ode.parameters = {};
+                    } else {
+                        this.checkIfRunReady();
+                    }
                 });
 
-                input.value = arg.value;
-                arg.isValid = this.isValidArgument(arg.value, argType);
-                if (arg.isValid) {
-                    input.classList.remove('invalid');
-                } else {
-                    input.classList.add('invalid');
-                }
+                input.value = argValues[argName];
+                input.dispatchEvent(new Event('input', { bubbles: true })); // Trigger input event to update UI
                 
                 const typeInfo = document.createElement('div');
                 typeInfo.className = 'argument-type';
@@ -176,11 +237,160 @@ class DynamicalSystemsUI {
             });
         } catch (error) {
             console.error(`Error loading ${componentType} arguments:`, error);
-            this.showError(`Failed to load ${componentType} arguments for ${componentName}`);
+            this.createPopUp(`Error loading ${componentType} arguments: ${error}`, false);
         }
     }
+
+    async generateStateFields(){
+        const section = this.components.ode.state.section;
+        const variables = this.components.ode.state.variables;
+        const parameters = this.components.ode.state.parameters;
+        const hasInvalidArgs = Object.values(this.fieldValidations.ode.args).some(arg => !arg);
+
+        if (hasInvalidArgs) {
+            section.style.display = 'none';
+            return;
+        }
+
+        section.style.display = 'block';
+        variables.innerHTML = '';
+        parameters.innerHTML = '';
+        
+        try {
+            const odeArgs = {};
+            Object.entries(this.componentConfigs.ode[this.selectedComponents.ode].args).forEach(([key, value]) => {
+                odeArgs[key] = value;
+            });
+            
+            const stateData = await this.fetchAPI(`/api/get-ode-state/${this.selectedComponents.ode}`, {
+                method: 'POST',
+                body: odeArgs
+            });
+            
+            // Generate variable fields
+            if (stateData.variables) {
+                stateData.variables.forEach(({name: varName}) => {
+                    this.createStateField('variables', varName, '0');
+                });
+            }
+            
+            // Generate parameter fields
+            if (stateData.parameters) {
+                stateData.parameters.forEach(({name: paramName}) => {
+                    this.createStateField('parameters', paramName, '0');
+                });
+            }
+        } catch (error) {
+            console.error('Error loading ODE state:', error);
+            this.createPopUp(`Error loading ODE state: ${error}`, false);
+        }
+    }
+
+    createStateField(fieldType, fieldName, fieldValue) {
+        const container = this.components.ode.state[fieldType];
+        
+        const fieldDiv = document.createElement('div');
+        fieldDiv.className = 'state-field';
+        
+        const label = document.createElement('label');
+        label.textContent = fieldName;
+        label.setAttribute('for', `${container.id}-${fieldName}`);
+        
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'state-input';
+        input.id = `${container.id}-${fieldName}`;
+        input.name = `${container.id}-${fieldName}`;
+        
+        // Initialize state config for this field
+        const odeJson = {
+            [this.selectedComponents.ode]: {
+                [fieldType]: {
+                    [fieldName]: fieldValue
+                }
+            }
+        }
+        this.componentConfigs.ode = this.mergeJsons(odeJson, this.componentConfigs.ode);
+        
+        const stateValues = this.componentConfigs.ode[this.selectedComponents.ode][fieldType];
+        const stateValidations = this.fieldValidations.ode[fieldType];
+        
+        // Add input event listener
+        input.addEventListener('input', (e) => {
+            stateValues[fieldName] = e.target.value;
+            stateValidations[fieldName] = this.isValidField(e.target.value, 'float');
+            if (stateValidations[fieldName]) {
+                input.classList.remove('invalid');
+            } else {
+                input.classList.add('invalid');
+            }
+            this.checkIfRunReady();
+        });
+        
+        input.value = stateValues[fieldName];
+        input.dispatchEvent(new Event('input', { bubbles: true })); // Trigger input event to update UI
+        
+        const typeInfo = document.createElement('div');
+        typeInfo.className = 'state-type';
+        typeInfo.textContent = 'Type: float';
+        
+        fieldDiv.appendChild(label);
+        fieldDiv.appendChild(input);
+        fieldDiv.appendChild(typeInfo);
+        container.appendChild(fieldDiv);
+    }
+
+    checkIfRunReady() {
+        const isAllSelected = Object.values(this.selectedComponents).every(component => component !== null);
+        if (!isAllSelected) {
+            this.components.run.button.disabled = true;
+            return;
+        }
+        const isOdeArgsValid = Object.values(this.fieldValidations.ode.args).every(arg => arg);
+        const isOdeVariablesValid = Object.values(this.fieldValidations.ode.variables).every(arg => arg);
+        const isOdeParametersValid = Object.values(this.fieldValidations.ode.parameters).every(arg => arg);
+        const isSolverArgsValid = Object.values(this.fieldValidations.solver.args).every(arg => arg);
+        const isJobArgsValid = Object.values(this.fieldValidations.job.args).every(arg => arg);
+        if (isOdeArgsValid && isOdeVariablesValid && isOdeParametersValid
+            && isSolverArgsValid && isJobArgsValid) {
+            this.components.run.button.disabled = false;
+        } else {
+            this.components.run.button.disabled = true;
+        }
+    }
+
+    runSimulation() {
+        const odeArgs = this.componentConfigs.ode[this.selectedComponents.ode].args;
+        const odeVariables = this.componentConfigs.ode[this.selectedComponents.ode].variables;
+        const odeParameters = this.componentConfigs.ode[this.selectedComponents.ode].parameters;
+        const solverArgs = this.componentConfigs.solver[this.selectedComponents.solver].args;
+        const jobArgs = this.componentConfigs.job[this.selectedComponents.job].args;
+        this.components.run.button.disabled = true;
+        this.showLoading(true);
+        this.fetchAPI(`/api/run-job/${this.selectedComponents.ode}/${this.selectedComponents.solver}/${this.selectedComponents.job}`, {
+            method: 'POST',
+            body: {
+                ode: odeArgs,
+                variables: odeVariables,
+                parameters: odeParameters,
+                solver: solverArgs,
+                job: jobArgs
+            }
+        })
+        .then(response => {
+            this.createPopUp('Simulation completed successfully', true);
+        })
+        .catch(error => {
+            console.error('Error running simulation:', error);
+            this.createPopUp(`Error running simulation: ${error}`, false);
+        })
+        .finally(() => {
+            this.components.run.button.disabled = false;
+            this.showLoading(false);
+        });
+    }
     
-    isValidArgument(argValue, argType) {
+    isValidField(argValue, argType) {
         const value = String(argValue).trim();
         
         if (value === '') {
@@ -213,49 +423,49 @@ class DynamicalSystemsUI {
         }
     }
 
-    validateComponentArguments(componentType, componentName) {
-        const args = this.componentConfigs[componentType][componentName].args;
-        
-        // Check if any arguments are invalid
-        const hasInvalidArgs = Object.values(args).some(arg => !arg.isValid);
-        
-        if (hasInvalidArgs) {
-            this.components[componentType].arguments.section.classList.add('invalid');
-        } else {
-            this.components[componentType].arguments.section.classList.remove('invalid');
+    mergeJsons(obj1, obj2) {
+        const result = typeof obj1 === 'object' ? { ...obj1 } : {};
+        if (typeof obj2 !== 'object') {
+            return result;
         }
-    }
-    
-    showResults(content) {
-        const resultsSection = document.getElementById('results-section');
-        const resultsContent = document.getElementById('results-content');
-        
-        if (typeof content === 'string') {
-            resultsContent.innerHTML = content;
-        } else {
-            resultsContent.innerHTML = '';
-            resultsContent.appendChild(content);
+        for (const key in obj2) {
+            if (
+                obj2[key] && typeof obj2[key] === 'object' && !Array.isArray(obj2[key])
+                && obj1[key] && typeof obj1[key] === 'object' && !Array.isArray(obj1[key])
+            ){
+                result[key] = this.mergeJsons(result[key], obj2[key]);
+            } else {
+                result[key] = obj2[key];
+            }
         }
-        
-        resultsSection.style.display = 'block';
+        return result;
     }
-    
-    showError(message) {
-        const errorDiv = document.createElement('div');
-        errorDiv.className = 'error';
-        errorDiv.textContent = message;
+
+    createPopUp(message, isSuccess = true) {
+        const type = isSuccess ? 'success' : 'error';
         
-        // Remove existing error messages
-        const existingErrors = document.querySelectorAll('.error');
-        existingErrors.forEach(error => error.remove());
-        
-        // Add new error message
-        document.querySelector('.form-section').appendChild(errorDiv);
-        
-        // Auto-remove after 5 seconds
+        // Remove existing popups FIRST
+        const existingPopUps = document.querySelectorAll(`.${type}`);
+        existingPopUps.forEach(popup => {
+            popup.classList.add('fade-out');
+            setTimeout(() => popup.remove(), 300);
+        });
+
+        // Create and add new popup AFTER cleaning up existing ones
+        const popUp = document.createElement('div');
+        popUp.className = `${type}`;
+        popUp.textContent = message;
+        document.body.appendChild(popUp);
+
+        // Auto-remove after 5 seconds with fade-out animation
         setTimeout(() => {
-            if (errorDiv.parentNode) {
-                errorDiv.parentNode.removeChild(errorDiv);
+            if (popUp.parentNode) {
+                popUp.classList.add('fade-out');
+                setTimeout(() => {
+                    if (popUp.parentNode) {
+                        popUp.parentNode.removeChild(popUp);
+                    }
+                }, 300);
             }
         }, 5000);
     }
@@ -273,4 +483,4 @@ class DynamicalSystemsUI {
 // Initialize the application when the DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     new DynamicalSystemsUI();
-}); 
+});

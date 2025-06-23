@@ -29,18 +29,18 @@
                 <div id="ode-arguments" class="arguments-section" style="display: none;">
                     <h3>ODE Arguments</h3>
                     <div id="ode-arguments-fields"></div>
-                    <button id="ode-arguments-apply-btn" class="btn btn-primary">Apply</button>
+                    <button id="ode-arguments-apply-btn" class="btn btn-primary" disabled>Apply</button>
                 </div>
 
                 <!-- ODE State -->
                 <div id="ode-state" class="state-section" style="display: none;">
                     <h3>ODE State</h3>
                     <div id="ode-state-content" class="state-columns">
-                        <div class="state-column">
+                        <div class="state-grid">
                             <h4>State Variables</h4>
                             <div id="ode-state-content-variables"></div>
                         </div>
-                        <div class="parameters-column">
+                        <div class="state-grid">
                             <h4>Parameters</h4>
                             <div id="ode-state-content-parameters"></div>
                         </div>
@@ -77,14 +77,8 @@
 
                 <!-- Action Buttons -->
                 <div class="form-actions">
-                    <button id="run-simulation" class="btn btn-primary" disabled>Run Simulation</button>
+                    <button id="run-btn" class="btn btn-primary" disabled>Run Simulation</button>
                 </div>
-            </div>
-
-            <!-- Results Section -->
-            <div id="results-section" class="results-section" style="display: none;">
-                <h2>Simulation Results</h2>
-                <div id="results-content"></div>
             </div>
         </main>
     </div>
