@@ -68,8 +68,23 @@ class DynamicalSystemsUI {
             },
             run: {
                 button: document.getElementById('run-btn')
+            },
+            cancel: {
+                button: document.getElementById('cancel-btn')
+            },
+            testProgress: {
+                button: document.getElementById('test-progress-btn')
+            },
+            progress: {
+                section: document.getElementById('progress-section'),
+                fill: document.getElementById('progress-fill'),
+                percentage: document.getElementById('progress-percentage'),
+                message: document.getElementById('progress-message')
             }
         }
+        
+        this.currentJobId = null;
+        this.eventSource = null;
         
         this.init();
     }
@@ -110,7 +125,11 @@ class DynamicalSystemsUI {
         });
 
         this.components.run.button.addEventListener('click', () => {
-            this.runSimulation();
+            this.runJob();
+        });
+
+        this.components.testProgress.button.addEventListener('click', () => {
+            this.runMockJob();
         });
     }
     
@@ -359,7 +378,7 @@ class DynamicalSystemsUI {
         }
     }
 
-    runSimulation() {
+    runJob() {
         const odeArgs = this.componentConfigs.ode[this.selectedComponents.ode].args;
         const odeVariables = this.componentConfigs.ode[this.selectedComponents.ode].variables;
         const odeParameters = this.componentConfigs.ode[this.selectedComponents.ode].parameters;
@@ -378,16 +397,98 @@ class DynamicalSystemsUI {
             }
         })
         .then(response => {
-            this.createPopUp('Simulation completed successfully', true);
+            this.createPopUp('Job completed successfully', true);
         })
         .catch(error => {
-            console.error('Error running simulation:', error);
-            this.createPopUp(`Error running simulation: ${error}`, false);
+            console.error('Error running job:', error);
+            this.createPopUp(`Error running job: ${error}`, false);
         })
         .finally(() => {
             this.components.run.button.disabled = false;
             this.showLoading(false);
         });
+    }
+
+    startProgressTracking(jobId) {
+        // Close any existing event source
+        if (this.eventSource) {
+            this.eventSource.close();
+        }
+
+        this.eventSource = new EventSource(`/api/progress/${jobId}`);
+        
+        this.eventSource.onmessage = (event) => {
+            try {
+                const progress = JSON.parse(event.data);
+                this.updateProgress(progress);
+                
+                if (progress.status === 'completed') {
+                    this.createPopUp('Job completed successfully!', true);
+                    this.resetJobState();
+                } else if (progress.status === 'error') {
+                    this.createPopUp(`Job failed: ${progress.message}`, false);
+                    this.resetJobState();
+                }
+            } catch (e) {
+                console.error('Error parsing progress data:', e);
+            }
+        };
+        
+        this.eventSource.onerror = (event) => {
+            console.error('EventSource failed:', event);
+            this.createPopUp('Connection to server lost', false);
+            this.resetJobState();
+        };
+    }
+
+    updateProgress(progress) {
+        const percentage = Math.round((progress.current / progress.total) * 100);
+        
+        this.components.progress.fill.style.width = `${percentage}%`;
+        this.components.progress.percentage.textContent = `${percentage}%`;
+        this.components.progress.message.textContent = progress.message || 'Processing...';
+    }
+
+    showProgress(show) {
+        if (show) {
+            this.components.progress.section.style.display = 'block';
+            this.updateProgress({ current: 0, total: 100, message: 'Starting...' });
+        } else {
+            this.components.progress.section.style.display = 'none';
+        }
+    }
+
+    runMockJob() {
+        this.fetchAPI('/api/run-job-mock', {
+            method: 'POST',
+            body: {}
+        })
+        .then(response => {
+            if (response.status === 'started' && response.job_id) {
+                this.currentJobId = response.job_id;
+                this.startProgressTracking(response.job_id);
+            } else {
+                throw new Error('Failed to start mock job');
+            }
+        })
+        .catch(error => {
+            console.error('Error starting mock job:', error);
+            this.createPopUp(`Error starting mock job: ${error}`, false);
+            this.resetMockJobState();
+        });
+    }
+
+    resetJobState() {
+        if (this.eventSource) {
+            this.eventSource.close();
+            this.eventSource = null;
+        }
+        
+        this.currentJobId = null;
+    }
+
+    resetMockJobState() {
+        this.resetJobState();
     }
     
     isValidField(argValue, argType) {

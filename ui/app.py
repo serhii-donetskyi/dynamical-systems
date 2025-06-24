@@ -9,6 +9,8 @@ from flask_cors import CORS
 import os
 import sys
 import json
+import time
+import threading
 from typing import Dict, Any, Optional, List
 
 # Add the project root to Python path
@@ -23,6 +25,8 @@ app.secret_key = 'dynamical-systems-ui-key'
 odes = {}
 solvers = {}
 jobs = {}
+components_loaded = False
+loading_progress = {}
 
 def scan_components():
     project_dir = os.path.join(os.path.dirname(__file__), '..')
@@ -170,6 +174,116 @@ def run_job(ode_name, solver_name, job_name):
         return jsonify({'status': 'success'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/run-job-mock', methods=['POST'])
+def run_job_mock():
+    """Mock endpoint for testing progress functionality"""
+    try:
+        job_id = str(int(time.time() * 1000))  # Generate unique job ID
+        
+        # Store mock job data for the progress endpoint
+        loading_progress[job_id] = {
+            'current': 0,
+            'total': 100,
+            'status': 'started',
+            'message': 'Starting mock job...',
+        }
+        
+        # Start mock job in background thread
+        def run_mock_job_async():
+            try:
+                _execute_mock_job(job_id)
+            except Exception as e:
+                if job_id in loading_progress:
+                    loading_progress[job_id]['status'] = 'error'
+                    loading_progress[job_id]['message'] = f'Error: {str(e)}'
+        
+        thread = threading.Thread(target=run_mock_job_async)
+        thread.daemon = True
+        thread.start()
+        
+        return jsonify({'status': 'started', 'job_id': job_id})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+def _execute_mock_job(job_id):
+    """Execute a mock job with realistic progress updates"""
+    try:
+        progress = loading_progress[job_id]
+        
+        # Simulate various stages of job execution
+        stages = [
+            (5, 'Initializing system...'),
+            (15, 'Loading configuration...'),
+            (25, 'Validating parameters...'),
+            (35, 'Setting up computation...'),
+            (45, 'Allocating memory...'),
+            (55, 'Starting simulation...'),
+            (65, 'Processing data (25%)...'),
+            (75, 'Processing data (50%)...'),
+            (85, 'Processing data (75%)...'),
+            (95, 'Finalizing results...'),
+            (100, 'Complete!')
+        ]
+        
+        for current, message in stages:
+            if job_id not in loading_progress:  # Job was cancelled
+                return
+                
+            progress['current'] = current
+            progress['message'] = message
+            
+            # Simulate variable processing time
+            if current < 50:
+                time.sleep(0.8)  # Slower at the beginning
+            elif current < 90:
+                time.sleep(1.2)  # Slower during main processing
+            else:
+                time.sleep(0.5)  # Faster at the end
+        
+        progress['status'] = 'completed'
+        progress['message'] = 'Mock job completed successfully!'
+        
+    except Exception as e:
+        if job_id in loading_progress:
+            progress['status'] = 'error'
+            progress['message'] = f'Mock job error: {str(e)}'
+
+@app.route('/api/progress/<job_id>')
+def progress_stream(job_id):
+    def generate():
+        try:
+            while True:
+                if job_id not in loading_progress:
+                    yield f"data: {json.dumps({'error': 'Job not found'})}\n\n"
+                    break
+                
+                progress = loading_progress[job_id]
+                yield f"data: {json.dumps(progress)}\n\n"
+                
+                if progress['status'] in ['completed', 'error']:
+                    # Clean up after a short delay
+                    time.sleep(2)
+                    if job_id in loading_progress:
+                        del loading_progress[job_id]
+                    break
+                    
+                time.sleep(0.5)  # Update every 500ms
+                
+        except GeneratorExit:
+            # Client disconnected
+            if job_id in loading_progress:
+                del loading_progress[job_id]
+    
+    return Response(
+        generate(),
+        mimetype='text/event-stream',
+        headers={
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+            'Access-Control-Allow-Origin': '*'
+        }
+    )
 
 if __name__ == '__main__':
     print("Starting Dynamical Systems Web UI...")
