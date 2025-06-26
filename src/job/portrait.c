@@ -21,11 +21,10 @@ const char* job(ode_t *restrict ode, solver_t *restrict solver, R *restrict data
         return error;
     }
 
-    fprintf(stderr, "DEBUG: File opened\n");
     FILE *file = fopen(file_path, "w");
     if (!file) error = strerror(errno);
 
-    // printf("%ld\n", progress);
+    printf("%ld\n", progress);
 
     for (; steps < max_steps; ++steps) {
         if (error) break;
@@ -33,7 +32,7 @@ const char* job(ode_t *restrict ode, solver_t *restrict solver, R *restrict data
 
         progress = (I)((ode->t - tstart) / (tend - tstart) * 100);
         if (progress > progress_prev) {
-            // printf("%ld\n", progress);
+            printf("%ld\n", progress);
             progress_prev = progress;
         }
         
@@ -53,7 +52,7 @@ const char* job(ode_t *restrict ode, solver_t *restrict solver, R *restrict data
     }
     if (progress < 100) {
         progress++;
-        // printf("%ld\n", progress);
+        printf("%ld\n", progress);
     }
     if (steps >= max_steps) error = "Job has failed to finish in 1,000,000,000 steps";
     fclose(file);
