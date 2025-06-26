@@ -415,12 +415,16 @@ class DynamicalSystemsUI {
             this.eventSource.close();
         }
 
-        this.eventSource = new EventSource(`/api/progress/${jobId}`);
+        this.eventSource = new EventSource(`/api/job-event-stream/${jobId}`);
         
         this.eventSource.onmessage = (event) => {
             try {
                 const progress = JSON.parse(event.data);
-                this.updateProgress(progress);
+                const percentage = Math.round((progress.current / progress.total) * 100);
+                
+                this.components.progress.fill.style.width = `${percentage}%`;
+                this.components.progress.percentage.textContent = `${percentage}%`;
+                this.components.progress.message.textContent = progress.message || 'Processing...';
                 
                 if (progress.status === 'completed') {
                     this.createPopUp('Job completed successfully!', true);
@@ -441,40 +445,56 @@ class DynamicalSystemsUI {
         };
     }
 
-    updateProgress(progress) {
-        const percentage = Math.round((progress.current / progress.total) * 100);
-        
-        this.components.progress.fill.style.width = `${percentage}%`;
-        this.components.progress.percentage.textContent = `${percentage}%`;
-        this.components.progress.message.textContent = progress.message || 'Processing...';
-    }
-
-    showProgress(show) {
-        if (show) {
-            this.components.progress.section.style.display = 'block';
-            this.updateProgress({ current: 0, total: 100, message: 'Starting...' });
-        } else {
-            this.components.progress.section.style.display = 'none';
-        }
-    }
-
     runMockJob() {
         this.fetchAPI('/api/run-job-mock', {
             method: 'POST',
             body: {}
         })
         .then(response => {
-            if (response.status === 'started' && response.job_id) {
-                this.currentJobId = response.job_id;
-                this.startProgressTracking(response.job_id);
-            } else {
+            if (response.status !== 'started' || !response.job_id) {
                 throw new Error('Failed to start mock job');
             }
+            
+            this.currentJobId = response.job_id;
+            // Close any existing event source
+            if (this.eventSource) {
+                this.eventSource.close();
+            }
+    
+            this.eventSource = new EventSource(`/api/job-event-stream/${this.currentJobId}`);
+            
+            this.eventSource.onmessage = (event) => {
+                try {
+                    const eventData = JSON.parse(event.data);
+                    const percentage = parseInt(eventData.progress);
+
+                    this.components.progress.fill.style.width = `${percentage}%`;
+                    this.components.progress.percentage.textContent = `${percentage}%`;
+                    this.components.progress.message.textContent = eventData.message;
+                    
+                    if (eventData.status === 'completed') {
+                        this.createPopUp(eventData.message, true);
+                        this.resetJobState();
+                    } else if (eventData.status === 'error') {
+                        this.createPopUp(eventData.message, false);
+                        this.resetJobState();
+                    }
+                } catch (e) {
+                    console.error('Error parsing progress data:', e);
+                }
+            };
+            
+            this.eventSource.onerror = (event) => {
+                console.error('EventSource failed:', event);
+                this.createPopUp('Connection to server lost', false);
+                this.resetJobState();
+            };
+            
         })
         .catch(error => {
             console.error('Error starting mock job:', error);
             this.createPopUp(`Error starting mock job: ${error}`, false);
-            this.resetMockJobState();
+            this.resetJobState();
         });
     }
 
@@ -483,12 +503,7 @@ class DynamicalSystemsUI {
             this.eventSource.close();
             this.eventSource = null;
         }
-        
         this.currentJobId = null;
-    }
-
-    resetMockJobState() {
-        this.resetJobState();
     }
     
     isValidField(argValue, argType) {

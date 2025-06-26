@@ -10,13 +10,12 @@ import os
 import sys
 import json
 import time
-import threading
-from typing import Dict, Any, Optional, List
+import multiprocessing
+import traceback
 
 # Add the project root to Python path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from dynamical_systems import OdeFactory, Ode, SolverFactory, Solver, Job
-
 
 app = Flask(__name__)
 CORS(app)
@@ -25,8 +24,7 @@ app.secret_key = 'dynamical-systems-ui-key'
 odes = {}
 solvers = {}
 jobs = {}
-components_loaded = False
-loading_progress = {}
+processes = {}
 
 def scan_components():
     project_dir = os.path.join(os.path.dirname(__file__), '..')
@@ -52,6 +50,94 @@ def scan_components():
             job_name = file[:-3]
             full_path = os.path.join(job_dir, file)
             jobs[job_name] = Job(full_path)
+
+class JobProcess:
+    class AliveAfterEndError(Exception):
+        pass
+    class TerminatedWithoutEndError(Exception):
+        pass
+
+    """Custom stdout that sends lines to queue immediately"""
+    def __init__(self, fn, *args, **kwargs):
+        self.queue = multiprocessing.Queue()
+        self.process = multiprocessing.Process(target=self)
+        self.buffer = ""
+        self.fn = fn
+        self.args = args
+        self.kwargs = kwargs
+    
+    def write(self, text):
+        self.buffer += text
+        while '\n' in self.buffer:
+            line, self.buffer = self.buffer.split('\n', 1)
+            line = line.strip()
+            if line:
+                self.queue.put(line)
+        return len(text)
+    
+    def flush(self):
+        line = self.buffer.strip()
+        if line:
+            self.queue.put(line)
+        self.buffer = ""
+
+    def start(self):
+        self.process.start()
+
+    def join(self, timeout: float | None = None):
+        self.process.join(timeout)
+
+    def is_alive(self):
+        return self.process.is_alive()
+
+    def terminate(self):
+        if self.process.is_alive():
+            self.process.terminate()
+
+    def kill(self):
+        if self.process.is_alive():
+            self.process.kill()
+
+    def get_lines(self):
+        def get():
+            return self.queue.get(timeout=5)
+        def get_nowait():
+            return self.queue.get_nowait()
+        fetch = get
+        while True:
+            try:
+                line = fetch()
+                if line is None:
+                    self.process.join(timeout=1)
+                    if self.process.is_alive():
+                        raise self.AliveAfterEndError("Process is alive after end")
+                    return
+                if isinstance(line, Exception):
+                    raise line
+                yield line
+            except multiprocessing.queues.Empty:
+                if self.process.is_alive():
+                    continue
+                if fetch is get:
+                    fetch = get_nowait
+                raise self.TerminatedWithoutEndError("Process has ended without end")
+    
+    def __call__(self):
+        import sys
+        old_stdout = sys.stdout
+        sys.stdout = self
+        
+        try:
+            res = self.fn(*self.args, **self.kwargs)
+            self.queue.put(None)
+            return res
+        except Exception as e:
+            self.queue.put(e)
+            print(traceback.format_exc(), file=sys.stderr)
+            print(str(e), file=sys.stderr)
+        finally:
+            sys.stdout = old_stdout
+
 
 @app.route('/')
 def index():
@@ -175,105 +261,60 @@ def run_job(ode_name, solver_name, job_name):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+def mock_job():
+    for i in range(101):
+        time.sleep(1)
+        print(i)
+
 @app.route('/api/run-job-mock', methods=['POST'])
 def run_job_mock():
-    """Mock endpoint for testing progress functionality"""
     try:
-        job_id = str(int(time.time() * 1000))  # Generate unique job ID
-        
-        # Store mock job data for the progress endpoint
-        loading_progress[job_id] = {
-            'current': 0,
-            'total': 100,
-            'status': 'started',
-            'message': 'Starting mock job...',
-        }
-        
-        # Start mock job in background thread
-        def run_mock_job_async():
-            try:
-                _execute_mock_job(job_id)
-            except Exception as e:
-                if job_id in loading_progress:
-                    loading_progress[job_id]['status'] = 'error'
-                    loading_progress[job_id]['message'] = f'Error: {str(e)}'
-        
-        thread = threading.Thread(target=run_mock_job_async)
-        thread.daemon = True
-        thread.start()
-        
+        job_id = str(int(time.time() * 1000))
+        process = JobProcess(mock_job)
+        process.start()
+        processes[job_id] = process
         return jsonify({'status': 'started', 'job_id': job_id})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-def _execute_mock_job(job_id):
-    """Execute a mock job with realistic progress updates"""
-    try:
-        progress = loading_progress[job_id]
-        
-        # Simulate various stages of job execution
-        stages = [
-            (5, 'Initializing system...'),
-            (15, 'Loading configuration...'),
-            (25, 'Validating parameters...'),
-            (35, 'Setting up computation...'),
-            (45, 'Allocating memory...'),
-            (55, 'Starting simulation...'),
-            (65, 'Processing data (25%)...'),
-            (75, 'Processing data (50%)...'),
-            (85, 'Processing data (75%)...'),
-            (95, 'Finalizing results...'),
-            (100, 'Complete!')
-        ]
-        
-        for current, message in stages:
-            if job_id not in loading_progress:  # Job was cancelled
-                return
-                
-            progress['current'] = current
-            progress['message'] = message
-            
-            # Simulate variable processing time
-            if current < 50:
-                time.sleep(0.8)  # Slower at the beginning
-            elif current < 90:
-                time.sleep(1.2)  # Slower during main processing
-            else:
-                time.sleep(0.5)  # Faster at the end
-        
-        progress['status'] = 'completed'
-        progress['message'] = 'Mock job completed successfully!'
-        
-    except Exception as e:
-        if job_id in loading_progress:
-            progress['status'] = 'error'
-            progress['message'] = f'Mock job error: {str(e)}'
-
-@app.route('/api/progress/<job_id>')
-def progress_stream(job_id):
+@app.route('/api/job-event-stream/<job_id>')
+def job_event_stream(job_id):
     def generate():
+        status = {
+            'progress': 0,
+            'status': 'error',
+            'message': ''
+        }
+        if job_id not in processes:
+            status['status'] = 'error'
+            status['message'] = 'Job not found'
+            yield f"data: {json.dumps(status)}\n\n"
+            return
+        
+        process = processes[job_id]
+
+        if not process:
+            status['status'] = 'error'
+            status['message'] = 'Failed to start process'
+            yield f"data: {json.dumps(status)}\n\n"
+            return
         try:
-            while True:
-                if job_id not in loading_progress:
-                    yield f"data: {json.dumps({'error': 'Job not found'})}\n\n"
-                    break
-                
-                progress = loading_progress[job_id]
-                yield f"data: {json.dumps(progress)}\n\n"
-                
-                if progress['status'] in ['completed', 'error']:
-                    # Clean up after a short delay
-                    time.sleep(2)
-                    if job_id in loading_progress:
-                        del loading_progress[job_id]
-                    break
-                    
-                time.sleep(0.5)  # Update every 500ms
-                
-        except GeneratorExit:
-            # Client disconnected
-            if job_id in loading_progress:
-                del loading_progress[job_id]
+            for line in process.get_lines():
+                progress = int(line.strip())
+                status['progress'] = progress
+                status['status'] = 'running' if progress < 100 else 'completed'
+                status['message'] = f'Processing...' if progress < 100 else 'Job finished'
+                yield f"data: {json.dumps(status)}\n\n"
+        except Exception as e:
+            status['status'] = 'error'
+            status['message'] = f'Error: {str(e)}'
+            yield f"data: {json.dumps(status)}\n\n"
+        finally:
+            process.terminate()
+            process.join(timeout=5)
+            if process.is_alive():
+                process.kill()
+        del processes[job_id]
     
     return Response(
         generate(),
