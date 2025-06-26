@@ -142,7 +142,7 @@ static PyObject *JobObjectPy_run(JobObjectPy *self, PyObject *args, PyObject *kw
     }
 
     // Call the job function
-    const char* error = self->output->fn(ode_py->ode, solver_py->solver, data, self->output->args);
+    const char* error = self->output->fn(ode_py->ode, solver_py->solver, data, _args);
 
     // Free data
     PyMem_Free(data);
