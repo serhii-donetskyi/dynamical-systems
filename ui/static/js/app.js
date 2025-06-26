@@ -497,24 +497,6 @@ class DynamicalSystemsUI {
         }
     }
 
-    mergeJsons(obj1, obj2) {
-        const result = typeof obj1 === 'object' ? { ...obj1 } : {};
-        if (typeof obj2 !== 'object') {
-            return result;
-        }
-        for (const key in obj2) {
-            if (
-                obj2[key] && typeof obj2[key] === 'object' && !Array.isArray(obj2[key])
-                && obj1[key] && typeof obj1[key] === 'object' && !Array.isArray(obj1[key])
-            ){
-                result[key] = this.mergeJsons(result[key], obj2[key]);
-            } else {
-                result[key] = obj2[key];
-            }
-        }
-        return result;
-    }
-
     createPopUp(message, isSuccess = true) {
         const type = isSuccess ? 'success' : 'error';
 
