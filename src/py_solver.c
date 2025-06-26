@@ -119,13 +119,21 @@ static PyObject *SolverFactoryObjectPy_create(SolverFactoryObjectPy *self, PyObj
 
     I arg_size = 0;
     while (self->output->args[arg_size].name) arg_size++;
-    char types[arg_size + 1];
+    // Allocate memory for arguments
+    argument_t *_args = PyMem_Malloc(sizeof(argument_t) * (arg_size + 1));
+    if (!_args) {
+        PyErr_SetString(PyExc_MemoryError, "Failed to allocate memory for arguments");
+        return NULL;
+    }
+    memcpy(_args, self->output->args, sizeof(argument_t) * (arg_size + 1));
+    // Create type string and arrays
+    char types[arg_size + 1]; // +1 for null terminator
     const char* names[arg_size];
     void* dest[arg_size];
     for (I i = 0; i < arg_size; i++) {
-        types[i] = (char)self->output->args[i].type;
-        names[i] = self->output->args[i].name;
-        dest[i] = &self->output->args[i].i;
+        types[i] = (char)_args[i].type;
+        names[i] = _args[i].name;
+        dest[i] = &_args[i].i;
     }
     types[arg_size] = '\0';
     
@@ -133,7 +141,7 @@ static PyObject *SolverFactoryObjectPy_create(SolverFactoryObjectPy *self, PyObj
         return NULL;
     }
 
-    const char* error = self->output->validate(self->output->args);
+    const char* error = self->output->validate(_args);
     if (error) {
         PyErr_SetString(PyExc_RuntimeError, error);
         return NULL;
@@ -144,7 +152,6 @@ static PyObject *SolverFactoryObjectPy_create(SolverFactoryObjectPy *self, PyObj
     py_solver->name = PyUnicode_FromString(self->output->name);
     // Allocate and initialize Solver structure
     solver_t *solver = PyMem_Malloc(sizeof(solver_t));
-    argument_t *_args = PyMem_Malloc(sizeof(argument_t) * (arg_size + 1));
 
     if (!py_solver || !solver || !_args) {
         PyErr_SetString(PyExc_RuntimeError, "Failed to create Solver");
@@ -154,8 +161,7 @@ static PyObject *SolverFactoryObjectPy_create(SolverFactoryObjectPy *self, PyObj
         return NULL;
     }
 
-    // Copy argument values to args
-    memcpy(_args, self->output->args, sizeof(argument_t) * (arg_size + 1));
+    // Copy everything to solver
     solver_t tmp = {
         .args = _args,
         .data_size = self->output->data_size,

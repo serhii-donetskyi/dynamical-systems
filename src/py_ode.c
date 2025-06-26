@@ -232,20 +232,27 @@ static PyObject *OdeFactoryObjectPy_create(OdeFactoryObjectPy *self, PyObject *a
     // Count number of arguments
     I arg_size = 0;
     while (self->output->args[arg_size].name) arg_size++;
-    char types[arg_size + 1];
+    argument_t *_args = PyMem_Malloc(sizeof(argument_t) * (arg_size + 1));
+    if (!_args) {
+        PyErr_SetString(PyExc_MemoryError, "Failed to allocate memory for arguments");
+        return NULL;
+    }
+    memcpy(_args, self->output->args, sizeof(argument_t) * (arg_size + 1));
+
+    char types[arg_size + 1]; // +1 for null terminator
     const char* names[arg_size];
     void* dest[arg_size];
     for (I i = 0; i < arg_size; i++) {
-        types[i] = (char)self->output->args[i].type;
-        names[i] = self->output->args[i].name;
-        dest[i] = &self->output->args[i].i;
+        types[i] = (char)_args[i].type;
+        names[i] = _args[i].name;
+        dest[i] = &_args[i].i;
     }
     types[arg_size] = '\0';
     if (!py_parse_args(args, kwargs, types, names, dest)){
         return NULL;
     }
     
-    const char* error = self->output->validate(self->output->args);
+    const char* error = self->output->validate(_args);
     if (error) {
         PyErr_SetString(PyExc_RuntimeError, error);
         return NULL;
@@ -256,11 +263,10 @@ static PyObject *OdeFactoryObjectPy_create(OdeFactoryObjectPy *self, PyObject *a
     py_ode->name = PyUnicode_FromString(self->output->name);
     // Allocate and initialize ODE structure
     ode_t *ode = PyMem_Malloc(sizeof(ode_t));
-    I x_size = self->output->x_size(self->output->args);
-    I p_size = self->output->p_size(self->output->args);
+    I x_size = self->output->x_size(_args);
+    I p_size = self->output->p_size(_args);
     R *x = PyMem_Malloc(sizeof(R) * x_size);
     R *p = PyMem_Malloc(sizeof(R) * p_size);
-    argument_t *_args = PyMem_Malloc(sizeof(argument_t) * (arg_size + 1));
 
     if (!py_ode || !ode || !x_size || !x || (p_size > 0 && !p_size) || !arg_size) {
         if (x_size == 0){
@@ -276,8 +282,7 @@ static PyObject *OdeFactoryObjectPy_create(OdeFactoryObjectPy *self, PyObject *a
         return NULL;
     }
 
-    // Copy argument values to args
-    memcpy(_args, self->output->args, sizeof(argument_t) * (arg_size + 1));
+    // Copy everything to ode
     ode_t tmp = {
         .x_size = x_size,
         .p_size = p_size,

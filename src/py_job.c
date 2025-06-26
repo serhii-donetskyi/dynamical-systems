@@ -100,6 +100,9 @@ static PyObject *JobObjectPy_run(JobObjectPy *self, PyObject *args, PyObject *kw
     while (self->output->args[arg_size].name) arg_size++;
     
     // Create type string and arrays (including ode and solver)
+    argument_t _args[arg_size + 1];
+    memcpy(_args, self->output->args, sizeof(argument_t) * (arg_size + 1));
+
     char types[arg_size + 3];  // +2 for ode/solver, +1 for null terminator
     char const* names[arg_size + 2];
     void* dest[arg_size + 2];
@@ -112,9 +115,9 @@ static PyObject *JobObjectPy_run(JobObjectPy *self, PyObject *args, PyObject *kw
     dest[1] = &solver_obj;
     
     for (I i = 0; i < arg_size; i++) {
-        types[i+2] = (char)self->output->args[i].type;
-        names[i+2] = self->output->args[i].name;
-        dest[i+2] = &self->output->args[i].i;
+        types[i+2] = (char)_args[i].type;
+        names[i+2] = _args[i].name;
+        dest[i+2] = &_args[i].i;
     }
     types[arg_size + 2] = '\0';
     
