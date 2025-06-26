@@ -12,7 +12,7 @@ static PyObject *SolverObjectPy_new(PyTypeObject *type, PyObject *args, PyObject
     if (!self) {
         return NULL;
     }
-    self->name = NULL;  // Initialize to NULL
+    self->factory = NULL;  // Initialize to NULL
     self->solver = NULL;  // Initialize to NULL
     return (PyObject *)self;
 }
@@ -31,18 +31,18 @@ static void SolverObjectPy_dealloc(SolverObjectPy *self) {
         if (self->solver) PyMem_Free(self->solver);
         self->solver = NULL;
     }
-    if (self->name) Py_DECREF(self->name);
+    if (self->factory) Py_DECREF(self->factory);
     Py_TYPE(self)->tp_free((PyObject *)self);
 }
 
 // get_name() method: returns the factory name
-static PyObject *SolverObjectPy_get_name(SolverObjectPy *self, PyObject *Py_UNUSED(ignored)) {
-    if (!self->name) {
+static SolverFactoryObjectPy *SolverObjectPy_get_factory(SolverObjectPy *self, PyObject *Py_UNUSED(ignored)) {
+    if (!self->factory) {
         PyErr_SetString(PyExc_RuntimeError, "Name not set");
         return NULL;
     }
-    Py_INCREF(self->name);  // Return new reference
-    return self->name;
+    Py_INCREF(self->factory);  // Return new reference
+    return self->factory;
 }
 
 static PyObject *SolverObjectPy_get_arguments(SolverObjectPy *self, PyObject *Py_UNUSED(ignored)) {
@@ -149,7 +149,8 @@ static PyObject *SolverFactoryObjectPy_create(SolverFactoryObjectPy *self, PyObj
 
     // Create Solver object
     SolverObjectPy *py_solver = (SolverObjectPy *)SolverTypePy.tp_alloc(&SolverTypePy, 0);
-    py_solver->name = PyUnicode_FromString(self->output->name);
+    py_solver->factory = self;
+    Py_INCREF(self);
     // Allocate and initialize Solver structure
     solver_t *solver = PyMem_Malloc(sizeof(solver_t));
 
@@ -194,7 +195,7 @@ static PyObject *SolverFactoryObjectPy_get_argument_types(SolverFactoryObjectPy 
 
 // Method tables
 static PyMethodDef SolverObjectPy_methods[] = {
-    {"get_name", (PyCFunction)SolverObjectPy_get_name, METH_NOARGS, "Return the name of the Solver."},
+    {"get_factory", (PyCFunction)SolverObjectPy_get_factory, METH_NOARGS, "Return the factory of the Solver."},
     {"get_arguments", (PyCFunction)SolverObjectPy_get_arguments, METH_NOARGS, "Get arguments of the Solver."},
     {NULL, NULL, 0, NULL}  /* Sentinel */
 };

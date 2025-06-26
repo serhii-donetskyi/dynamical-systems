@@ -12,7 +12,7 @@ static PyObject *OdeObjectPy_new(PyTypeObject *type, PyObject *args, PyObject *k
     if (!self) {
         return NULL;
     }
-    self->name = NULL;  // Initialize to NULL
+    self->factory = NULL;  // Initialize to NULL
     self->ode = NULL;   // Initialize to NULL
     return (PyObject *)self;
 }
@@ -33,18 +33,18 @@ static void OdeObjectPy_dealloc(OdeObjectPy *self) {
         if (self->ode) PyMem_Free(self->ode);
         self->ode = NULL;
     }
-    if (self->name) Py_DECREF(self->name);
+    if (self->factory) Py_DECREF(self->factory);
     Py_TYPE(self)->tp_free((PyObject *)self);
 }
 
 // get_name() method: returns the factory name
-static PyObject *OdeObjectPy_get_name(OdeObjectPy *self, PyObject *Py_UNUSED(ignored)) {
-    if (!self->name) {
+static OdeFactoryObjectPy *OdeObjectPy_get_factory(OdeObjectPy *self, PyObject *Py_UNUSED(ignored)) {
+    if (!self->factory) {
         PyErr_SetString(PyExc_RuntimeError, "Name not set");
         return NULL;
     }
-    Py_INCREF(self->name);  // Return new reference
-    return self->name;
+    Py_INCREF(self->factory);  // Return new reference
+    return self->factory;
 }
 
 static PyObject *OdeObjectPy_get_arguments(OdeObjectPy *self, PyObject *Py_UNUSED(ignored)) {
@@ -260,7 +260,8 @@ static PyObject *OdeFactoryObjectPy_create(OdeFactoryObjectPy *self, PyObject *a
 
     // Create ODE object
     OdeObjectPy *py_ode = (OdeObjectPy *)OdeTypePy.tp_alloc(&OdeTypePy, 0);
-    py_ode->name = PyUnicode_FromString(self->output->name);
+    py_ode->factory = self;
+    Py_INCREF(self);
     // Allocate and initialize ODE structure
     ode_t *ode = PyMem_Malloc(sizeof(ode_t));
     I x_size = self->output->x_size(_args);
@@ -317,7 +318,7 @@ static PyObject *OdeFactoryObjectPy_get_argument_types(OdeFactoryObjectPy *self,
 
 // Method tables
 static PyMethodDef OdeObjectPy_methods[] = {
-    {"get_name", (PyCFunction)OdeObjectPy_get_name, METH_NOARGS, "Return the name of the ODE."},
+    {"get_factory", (PyCFunction)OdeObjectPy_get_factory, METH_NOARGS, "Return the factory of the ODE."},
     {"get_arguments", (PyCFunction)OdeObjectPy_get_arguments, METH_NOARGS, "Get arguments of the ODE."},
     {"get_x_size", (PyCFunction)OdeObjectPy_get_x_size, METH_NOARGS, "Get x_size of the ODE."},
     {"get_p_size", (PyCFunction)OdeObjectPy_get_p_size, METH_NOARGS, "Get p_size of the ODE."},

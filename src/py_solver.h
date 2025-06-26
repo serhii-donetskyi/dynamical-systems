@@ -14,7 +14,7 @@ typedef struct {
 
 typedef struct {
     PyObject_HEAD
-    PyObject *name;
+    SolverFactoryObjectPy *factory;
     solver_t *solver;
 } SolverObjectPy;
 
