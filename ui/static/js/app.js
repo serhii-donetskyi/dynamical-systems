@@ -27,15 +27,12 @@ class DynamicalSystemsUI {
         }
 
         this.components = {
+            container: document.getElementById('container'),
             ode: {
-                dropdown: {
-                    select: document.getElementById('ode-dropdown-select')
-                },
+                dropdown: document.getElementById('ode-dropdown-select'),
                 arguments: {
                     section: document.getElementById('ode-arguments'),
-                    fields: {
-                        section: document.getElementById('ode-arguments-fields'),
-                    },
+                    fields: document.getElementById('ode-arguments-fields'),
                     apply: document.getElementById('ode-arguments-apply-btn')
                 },
                 state: {
@@ -45,41 +42,30 @@ class DynamicalSystemsUI {
                 }
             },
             solver: {
-                dropdown: {
-                    select: document.getElementById('solver-dropdown-select')
-                },
+                dropdown: document.getElementById('solver-dropdown-select'),
                 arguments: {
                     section: document.getElementById('solver-arguments'),
-                    fields: {
-                        section: document.getElementById('solver-arguments-fields'),
-                    },
+                    fields: document.getElementById('solver-arguments-fields'),
                 }
             },
             job: {
-                dropdown: {
-                    select: document.getElementById('job-dropdown-select')
-                },
+                dropdown: document.getElementById('job-dropdown-select'),
                 arguments: {
                     section: document.getElementById('job-arguments'),
-                    fields: {
-                        section: document.getElementById('job-arguments-fields'),
-                    },
+                    fields: document.getElementById('job-arguments-fields'),
                 }
             },
-            run: {
-                button: document.getElementById('run-btn')
-            },
-            cancel: {
-                button: document.getElementById('cancel-btn')
-            },
-            testProgress: {
-                button: document.getElementById('test-progress-btn')
+            action: {
+                section: document.getElementById('action-section'),
+                run: document.getElementById('action-section-run-btn'),
+                cancel: document.getElementById('action-section-cancel-btn'),
+                testProgress: document.getElementById('action-section-test-progress-btn')
             },
             progress: {
                 section: document.getElementById('progress-section'),
-                fill: document.getElementById('progress-fill'),
-                percentage: document.getElementById('progress-percentage'),
-                message: document.getElementById('progress-message')
+                fill: document.getElementById('progress-section-fill'),
+                percentage: document.getElementById('progress-section-percentage'),
+                message: document.getElementById('progress-section-message')
             }
         }
         
@@ -102,20 +88,19 @@ class DynamicalSystemsUI {
             this.populateDropdown('solver', solvers);
             this.populateDropdown('job', jobs);
         } catch (error) {
-            console.error('Error loading components:', error);
             this.createPopUp(`Failed to load components: ${error}`, false);
         }
         
         // Dropdown change listeners
-        this.components.ode.dropdown.select.addEventListener('change', (e) => {
+        this.components.ode.dropdown.addEventListener('change', (e) => {
             this.generateArgumentFields('ode', e.target.value);
         });
         
-        this.components.solver.dropdown.select.addEventListener('change', (e) => {
+        this.components.solver.dropdown.addEventListener('change', (e) => {
             this.generateArgumentFields('solver', e.target.value);
         });
         
-        this.components.job.dropdown.select.addEventListener('change', (e) => {
+        this.components.job.dropdown.addEventListener('change', (e) => {
             this.generateArgumentFields('job', e.target.value);
         });
 
@@ -124,11 +109,11 @@ class DynamicalSystemsUI {
             this.generateStateFields();
         });
 
-        this.components.run.button.addEventListener('click', () => {
+        this.components.action.run.addEventListener('click', () => {
             this.runJob();
         });
 
-        this.components.testProgress.button.addEventListener('click', () => {
+        this.components.action.testProgress.addEventListener('click', () => {
             this.runMockJob();
         });
     }
@@ -157,27 +142,27 @@ class DynamicalSystemsUI {
     }
 
     populateDropdown(componentType, options) {
-        const select = this.components[componentType].dropdown.select;
-        while (select.children.length > 1) {
-            select.removeChild(select.lastChild);
+        const dropdown = this.components[componentType].dropdown;
+        while (dropdown.children.length > 1) {
+            dropdown.removeChild(dropdown.lastChild);
         }
         options.forEach(option => {
             const optionElement = document.createElement('option');
             optionElement.value = option;
             optionElement.textContent = option;
-            select.appendChild(optionElement);
+            dropdown.appendChild(optionElement);
         });
     }
 
     async generateArgumentFields(componentType, componentName) {
         const section = this.components[componentType].arguments.section;
         if (!componentName) {
-            // Hide state section if ODE is deselected
             if (componentType === 'ode') {
                 this.components.ode.state.section.style.display = 'none';
                 this.components.ode.arguments.apply.disabled = true;
                 this.fieldValidations.ode.variables = {t: false};
                 this.fieldValidations.ode.parameters = {};
+                this.componentConfigs.ode[componentName] = {variables: {}, parameters: {}};
             }
             section.style.display = 'none'; // Hide the section
             this.selectedComponents[componentType] = null;
@@ -185,21 +170,21 @@ class DynamicalSystemsUI {
             this.checkIfRunReady();
             return;
         }
-        section.style.display = 'block'; // Show the section
-
-        const fields = this.components[componentType].arguments.fields.section;
-        const id = fields.id;
-        fields.innerHTML = '';
-        
-        const componentConfigJson = {
-            [componentType]: {
-                [componentName]: {
-                    args: {}
-                }
+        if (!(componentName in this.componentConfigs[componentType])) {
+            this.componentConfigs[componentType][componentName] = {};
+            this.componentConfigs[componentType][componentName].args = {};
+            if (componentType === 'ode') {
+                this.componentConfigs.ode[componentName].variables = {};
+                this.componentConfigs.ode[componentName].parameters = {};
             }
         }
+        section.style.display = 'block'; // Show the section
+
+        const fields = this.components[componentType].arguments.fields;
+        const id = fields.id;
+        fields.innerHTML = '';
+
         this.selectedComponents[componentType] = componentName;
-        this.componentConfigs = this.mergeJsons(componentConfigJson, this.componentConfigs);
         this.fieldValidations[componentType].args = {};
 
         const argValues = this.componentConfigs[componentType][componentName].args;
@@ -255,7 +240,6 @@ class DynamicalSystemsUI {
                 fields.appendChild(fieldDiv);
             });
         } catch (error) {
-            console.error(`Error loading ${componentType} arguments:`, error);
             this.createPopUp(`Error loading ${componentType} arguments: ${error}`, false);
         }
     }
@@ -276,14 +260,9 @@ class DynamicalSystemsUI {
         parameters.innerHTML = '';
         
         try {
-            const odeArgs = {};
-            Object.entries(this.componentConfigs.ode[this.selectedComponents.ode].args).forEach(([key, value]) => {
-                odeArgs[key] = value;
-            });
-            
             const stateData = await this.fetchAPI(`/api/get-ode-state/${this.selectedComponents.ode}`, {
                 method: 'POST',
-                body: odeArgs
+                body: this.componentConfigs.ode[this.selectedComponents.ode].args
             });
             
             // Generate variable fields
@@ -300,7 +279,6 @@ class DynamicalSystemsUI {
                 });
             }
         } catch (error) {
-            console.error('Error loading ODE state:', error);
             this.createPopUp(`Error loading ODE state: ${error}`, false);
         }
     }
@@ -322,15 +300,6 @@ class DynamicalSystemsUI {
         input.name = `${container.id}-${fieldName}`;
         
         // Initialize state config for this field
-        const odeJson = {
-            [this.selectedComponents.ode]: {
-                [fieldType]: {
-                    [fieldName]: fieldValue
-                }
-            }
-        }
-        this.componentConfigs.ode = this.mergeJsons(odeJson, this.componentConfigs.ode);
-        
         const stateValues = this.componentConfigs.ode[this.selectedComponents.ode][fieldType];
         const stateValidations = this.fieldValidations.ode[fieldType];
         
@@ -346,7 +315,7 @@ class DynamicalSystemsUI {
             this.checkIfRunReady();
         });
         
-        input.value = stateValues[fieldName];
+        input.value = fieldValue;
         input.dispatchEvent(new Event('input', { bubbles: true })); // Trigger input event to update UI
         
         const typeInfo = document.createElement('div');
@@ -362,7 +331,7 @@ class DynamicalSystemsUI {
     checkIfRunReady() {
         const isAllSelected = Object.values(this.selectedComponents).every(component => component !== null);
         if (!isAllSelected) {
-            this.components.run.button.disabled = true;
+            this.components.action.run.disabled = true;
             return;
         }
         const isOdeArgsValid = Object.values(this.fieldValidations.ode.args).every(arg => arg);
@@ -372,40 +341,30 @@ class DynamicalSystemsUI {
         const isJobArgsValid = Object.values(this.fieldValidations.job.args).every(arg => arg);
         if (isOdeArgsValid && isOdeVariablesValid && isOdeParametersValid
             && isSolverArgsValid && isJobArgsValid) {
-            this.components.run.button.disabled = false;
+            this.components.action.run.disabled = false;
         } else {
-            this.components.run.button.disabled = true;
+            this.components.action.run.disabled = true;
         }
     }
 
     runJob() {
-        const odeArgs = this.componentConfigs.ode[this.selectedComponents.ode].args;
-        const odeVariables = this.componentConfigs.ode[this.selectedComponents.ode].variables;
-        const odeParameters = this.componentConfigs.ode[this.selectedComponents.ode].parameters;
-        const solverArgs = this.componentConfigs.solver[this.selectedComponents.solver].args;
-        const jobArgs = this.componentConfigs.job[this.selectedComponents.job].args;
-        this.components.run.button.disabled = true;
-        this.showLoading(true);
+        this.setLoading(true);
         this.fetchAPI(`/api/run-job/${this.selectedComponents.ode}/${this.selectedComponents.solver}/${this.selectedComponents.job}`, {
             method: 'POST',
             body: {
-                ode: odeArgs,
-                variables: odeVariables,
-                parameters: odeParameters,
-                solver: solverArgs,
-                job: jobArgs
+                ode: this.componentConfigs.ode[this.selectedComponents.ode],
+                solver: this.componentConfigs.solver[this.selectedComponents.solver],
+                job: this.componentConfigs.job[this.selectedComponents.job]
             }
         })
         .then(response => {
-            this.createPopUp('Job completed successfully', true);
+            this.createPopUp('Job has started', true);
         })
         .catch(error => {
-            console.error('Error running job:', error);
-            this.createPopUp(`Error running job: ${error}`, false);
+            this.createPopUp(`Error: ${error}`, false);
         })
         .finally(() => {
-            this.components.run.button.disabled = false;
-            this.showLoading(false);
+            this.setLoading(false);
         });
     }
 
@@ -419,27 +378,27 @@ class DynamicalSystemsUI {
         
         this.eventSource.onmessage = (event) => {
             try {
-                const progress = JSON.parse(event.data);
-                const percentage = Math.round((progress.current / progress.total) * 100);
+                const progressData = JSON.parse(event.data);
+                const progress = parseInt(progressData.progress);
                 
-                this.components.progress.fill.style.width = `${percentage}%`;
-                this.components.progress.percentage.textContent = `${percentage}%`;
-                this.components.progress.message.textContent = progress.message || 'Processing...';
+                this.components.progress.fill.style.width = `${progress}%`;
+                this.components.progress.percentage.textContent = `${progress}%`;
+                this.components.progress.message.textContent = progressData.message;
                 
-                if (progress.status === 'completed') {
-                    this.createPopUp('Job completed successfully!', true);
+                if (progressData.status === 'completed') {
+                    this.createPopUp(progressData.message, true);
                     this.resetJobState();
-                } else if (progress.status === 'error') {
-                    this.createPopUp(`Job failed: ${progress.message}`, false);
+                } else if (progressData.status === 'error') {
+                    this.createPopUp(progressData.message, false);
                     this.resetJobState();
                 }
             } catch (e) {
-                console.error('Error parsing progress data:', e);
+                this.createPopUp('Error parsing progress data', false);
+                this.resetJobState();
             }
         };
         
         this.eventSource.onerror = (event) => {
-            console.error('EventSource failed:', event);
             this.createPopUp('Connection to server lost', false);
             this.resetJobState();
         };
@@ -480,19 +439,18 @@ class DynamicalSystemsUI {
                         this.resetJobState();
                     }
                 } catch (e) {
-                    console.error('Error parsing progress data:', e);
+                    this.createPopUp('Error parsing progress data', false);
+                    this.resetJobState();
                 }
             };
             
             this.eventSource.onerror = (event) => {
-                console.error('EventSource failed:', event);
                 this.createPopUp('Connection to server lost', false);
                 this.resetJobState();
             };
             
         })
         .catch(error => {
-            console.error('Error starting mock job:', error);
             this.createPopUp(`Error starting mock job: ${error}`, false);
             this.resetJobState();
         });
@@ -559,9 +517,15 @@ class DynamicalSystemsUI {
 
     createPopUp(message, isSuccess = true) {
         const type = isSuccess ? 'success' : 'error';
+
+        if (isSuccess) {
+            console.log(message);
+        } else {
+            console.error(message);
+        }
         
         // Remove existing popups FIRST
-        const existingPopUps = document.querySelectorAll(`.${type}`);
+        const existingPopUps = document.querySelectorAll('#pop-up');
         existingPopUps.forEach(popup => {
             popup.classList.add('fade-out');
             setTimeout(() => popup.remove(), 300);
@@ -571,6 +535,7 @@ class DynamicalSystemsUI {
         const popUp = document.createElement('div');
         popUp.className = `${type}`;
         popUp.textContent = message;
+        popUp.id = 'pop-up';
         document.body.appendChild(popUp);
 
         // Auto-remove after 5 seconds with fade-out animation
@@ -586,12 +551,29 @@ class DynamicalSystemsUI {
         }, 5000);
     }
     
-    showLoading(show) {
-        const container = document.querySelector('.container');
-        if (show) {
+    setLoading(isLoading) {
+        const container = this.components.container;
+        const interactiveElements = [
+            this.components.action.run,
+            this.components.ode.dropdown,
+            this.components.solver.dropdown,
+            this.components.job.dropdown,
+            ...this.components.ode.arguments.fields.querySelectorAll('input'),
+            ...this.components.solver.arguments.fields.querySelectorAll('input'),
+            ...this.components.job.arguments.fields.querySelectorAll('input'),
+            ...this.components.ode.state.variables.querySelectorAll('input'),
+            ...this.components.ode.state.parameters.querySelectorAll('input'),
+        ]
+        if (isLoading) {
             container.classList.add('loading');
+            interactiveElements.forEach(element => {
+                element.disabled = true;
+            });
         } else {
             container.classList.remove('loading');
+            interactiveElements.forEach(element => {
+                element.disabled = false;
+            });
         }
     }
 }

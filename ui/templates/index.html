@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-    <div class="container">
+    <div id="container" class="container">
         <header>
             <h1>Dynamical Systems Web UI</h1>
             <p>Configure and run dynamical system simulations</p>
@@ -76,22 +76,22 @@
                 </div>
 
                 <!-- Action Buttons -->
-                <div class="form-actions">
-                    <button id="run-btn" class="btn btn-primary" disabled>Run Job</button>
-                    <button id="cancel-btn" class="btn btn-primary" disabled>Cancel Job</button>
-                    <button id="test-progress-btn" class="btn btn-secondary">Test Progress</button>
+                <div id="action-section" class="form-actions">
+                    <button id="action-section-run-btn" class="btn btn-primary" disabled>Run Job</button>
+                    <button id="action-section-cancel-btn" class="btn btn-primary" disabled>Cancel Job</button>
+                    <button id="action-section-test-progress-btn" class="btn btn-secondary">Test Progress</button>
                 </div>
 
                 <!-- Progress Section -->
-                <div id="progress-section" class="progress-section" style="display: block;">
+                <div id="progress-section" class="progress-section">
                     <h3>Job Progress</h3>
                     <div class="progress-container">
                         <div class="progress-bar">
-                            <div id="progress-fill" class="progress-fill"></div>
+                            <div id="progress-section-fill" class="progress-section-fill"></div>
                         </div>
                         <div class="progress-info">
-                            <span id="progress-percentage">0%</span>
-                            <span id="progress-message">No job running</span>
+                            <span id="progress-section-percentage">0%</span>
+                            <span id="progress-section-message">No job running</span>
                         </div>
                     </div>
                 </div>

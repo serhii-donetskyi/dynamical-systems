@@ -70,13 +70,12 @@ class JobProcess:
         self.buffer += text
         while '\n' in self.buffer:
             line, self.buffer = self.buffer.split('\n', 1)
-            line = line.strip()
             if line:
                 self.queue.put(line)
         return len(text)
     
     def flush(self):
-        line = self.buffer.strip()
+        line = self.buffer
         if line:
             self.queue.put(line)
         self.buffer = ""
@@ -119,7 +118,9 @@ class JobProcess:
                 if self.process.is_alive():
                     continue
                 if fetch is get:
-                    fetch = get_nowait
+                    # switch to non-blocking mode
+                    # to avoid race condition
+                    fetch = get_nowait 
                 raise self.TerminatedWithoutEndError("Process has ended without end")
     
     def __call__(self):
@@ -222,11 +223,9 @@ def get_ode_state(name):
 def run_job(ode_name, solver_name, job_name):
     try:
         data = request.get_json()
-        ode_args = data['ode']
-        solver_args = data['solver']
-        job_args = data['job']
-        variables = data['variables']
-        parameters = data['parameters']
+        ode_data = data['ode']
+        solver_data = data['solver']
+        job_data = data['job']
 
         ode_types = odes[ode_name].get_argument_types()
         solver_types = solvers[solver_name].get_argument_types()
@@ -236,23 +235,23 @@ def run_job(ode_name, solver_name, job_name):
         solver_kwargs = {}
         job_kwargs = {}
         for arg, tp in ode_types.items():
-            ode_kwargs[arg] = tp(ode_args[arg])
+            ode_kwargs[arg] = tp(ode_data['args'][arg])
         for arg, tp in solver_types.items():
-            solver_kwargs[arg] = tp(solver_args[arg])
+            solver_kwargs[arg] = tp(solver_data['args'][arg])
         for arg, tp in job_types.items():
             if arg in ['ode', 'solver']:
                 continue
-            job_kwargs[arg] = tp(job_args[arg])
+            job_kwargs[arg] = tp(job_data['args'][arg])
 
         ode = odes[ode_name].create(**ode_kwargs)
         solver = solvers[solver_name].create(**solver_kwargs)
         job = jobs[job_name]
 
-        ode.set_t(float(variables['t']))
+        ode.set_t(float(ode_data['variables']['t']))
         for i in range(ode.get_x_size()):
-            ode.set_x(i, float(variables[f'x[{i}]']))
+            ode.set_x(i, float(ode_data['variables'][f'x[{i}]']))
         for i in range(ode.get_p_size()):
-            ode.set_p(i, float(parameters[f'p[{i}]']))
+            ode.set_p(i, float(ode_data['parameters'][f'p[{i}]']))
 
         job_kwargs['ode'] = ode
         job_kwargs['solver'] = solver

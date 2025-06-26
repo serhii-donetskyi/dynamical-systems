@@ -270,8 +270,6 @@ main {
 
 /* Loading state */
 .loading {
-    opacity: 0.6;
-    pointer-events: none;
     position: relative;
 }
 
@@ -292,17 +290,6 @@ main {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
-/* Disable all form elements during loading except cancel button */
-.loading .btn:not(#cancel-btn) {
-    pointer-events: none;
-    opacity: 0.5;
-}
-
-/* Ensure cancel button remains functional during loading */
-.loading #cancel-btn {
-    pointer-events: auto;
-    opacity: 1;
-}
 
 @keyframes spin {
     0% { transform: rotate(0deg); }
