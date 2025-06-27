@@ -25,10 +25,12 @@ def build_c():
         shared_libs.append(cpp)
     for cpp in walk(os.path.join(current_dir, "src/job")):
         shared_libs.append(cpp)
+    for component in ["ode", "solver", "job"]:
+        os.makedirs(os.path.join(current_dir, f"dynamical_systems/{component}"), exist_ok=True)
     try:
         for cpp in shared_libs:
             subprocess.run(
-                cmd + [cpp, "-shared", "-o", cpp.replace(".c", ".so").replace("src/", "build/")]
+                cmd + [cpp, "-shared", "-o", cpp.replace(".c", ".so").replace("src/", "dynamical_systems/")]
                 ,check=True
             )
         # subprocess.run(
