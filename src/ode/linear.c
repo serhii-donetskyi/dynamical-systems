@@ -34,7 +34,7 @@ ode_output_t ode_output = {
             .i = 2
         },{
             .name = 0,
-            .type = REAL,
+            .type = 0,
             .r = 0,
         }
     },

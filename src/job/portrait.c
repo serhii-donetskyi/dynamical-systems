@@ -4,19 +4,20 @@
 #include <errno.h>
 #include <string.h>
 
+#define MAX_STEPS 1000000000L
+
 const char* job(ode_t *restrict ode, solver_t *restrict solver, R *restrict data, const argument_t *restrict args) {
     char *error = 0;
-    const I max_steps = 1000000000L;
     I steps = 0;
 
-    R tstart = ode->t;
+    const R t_start = ode->t;
     I progress = 0;
     I progress_prev = 0;
 
-    R tend = args[0].r;
+    const R t_end = args[0].r;
     const char *file_path = args[1].s;
 
-    if (tend < ode->t) {
+    if (t_end < ode->t) {
         error = "t_end must be greater than ODE's t";
         return error;
     }
@@ -26,11 +27,11 @@ const char* job(ode_t *restrict ode, solver_t *restrict solver, R *restrict data
 
     printf("%ld\n", progress);
 
-    for (; steps < max_steps; ++steps) {
+    for (; steps < MAX_STEPS; ++steps) {
         if (error) break;
-        if (ode->t > tend) break;
+        if (ode->t > t_end) break;
 
-        progress = (I)((ode->t - tstart) / (tend - tstart) * 100);
+        progress = (I)((ode->t - t_start) / (t_end - t_start) * 100);
         if (progress > progress_prev) {
             printf("%ld\n", progress);
             progress_prev = progress;
@@ -54,7 +55,7 @@ const char* job(ode_t *restrict ode, solver_t *restrict solver, R *restrict data
         progress++;
         printf("%ld\n", progress);
     }
-    if (steps >= max_steps) error = "Job has failed to finish in 1,000,000,000 steps";
+    if (steps >= MAX_STEPS) error = "Job has failed to finish in 1,000,000,000 steps";
     fclose(file);
     return error;
 }
@@ -75,8 +76,10 @@ job_output_t job_output = {
         },
         {
             .name = 0,
-            .type = INTEGER,
+            .type = 0,
             .i = 0,
         }
     },
 };
+
+#undef MAX_STEPS

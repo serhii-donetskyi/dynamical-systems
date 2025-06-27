@@ -65,7 +65,7 @@ solver_output_t solver_output = {
             .r = 0.01,
         },{
             .name = 0,
-            .type = INTEGER,
+            .type = 0,
             .i = 0,
         }
     },
