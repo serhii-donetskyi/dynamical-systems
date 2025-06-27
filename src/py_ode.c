@@ -105,7 +105,8 @@ static PyObject *OdeObjectPy_set_t(OdeObjectPy *self, PyObject *args, PyObject *
         return NULL;
     }
     self->ode->t = value;
-    Py_RETURN_NONE;
+    Py_INCREF(self);
+    return (PyObject *)self;
 }
 
 static PyObject *OdeObjectPy_get_x(OdeObjectPy *self, PyObject *Py_UNUSED(ignored)) {
@@ -128,18 +129,60 @@ static PyObject *OdeObjectPy_set_x(OdeObjectPy *self, PyObject *args, PyObject *
         PyErr_SetString(PyExc_RuntimeError, "Invalid ode");
         return NULL;
     }
-    char *kwlist[] = {"index", "value", NULL};
-    I index = 0;
-    R value = 0;
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "kd", kwlist, &index, &value)) {
+    char *kwlist[] = {"value", NULL};
+    PyObject *value = NULL;
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O", kwlist, &value)) {
         return NULL;
     }
-    if (index >= self->ode->x_size) {
-        PyErr_Format(PyExc_IndexError, "Index %d must be between 0 and %d", index, self->ode->x_size - 1);
+    
+    // Check if value is a sequence (list, tuple, etc.)
+    if (!PySequence_Check(value)) {
+        PyErr_SetString(PyExc_TypeError, "Value must be a sequence (list, tuple, etc.)");
         return NULL;
     }
-    self->ode->x[index] = value;
-    Py_RETURN_NONE;
+    
+    // Get the length of the sequence
+    Py_ssize_t seq_length = PySequence_Length(value);
+    if (seq_length < 0) {
+        return NULL; // Exception already set by PySequence_Length
+    }
+    
+    // Check if the sequence length matches the expected x_size
+    if (seq_length != self->ode->x_size) {
+        PyErr_Format(
+            PyExc_ValueError, 
+            "Sequence length must be %d, but got %zd", 
+            seq_length,
+            self->ode->x_size
+        );
+        return NULL;
+    }
+    
+    // Validate all elements are numbers and convert them to doubles
+    for (Py_ssize_t i = 0; i < seq_length; i++) {
+        PyObject *item = PySequence_GetItem(value, i);
+        if (!item) {
+            return NULL; // Exception already set
+        }
+        
+        // Convert to double
+        R double_value = PyFloat_AsDouble(item);
+        Py_DECREF(item);
+        
+        if (PyErr_Occurred()) {
+            // PyFloat_AsDouble failed, but let's provide a clearer error
+            PyErr_Format(
+                PyExc_ValueError, 
+                "Element at index %zd cannot be converted to float",
+                i
+            );
+            return NULL;
+        }
+        self->ode->x[i] = double_value;
+    }
+    
+    Py_INCREF(self);
+    return (PyObject *)self;
 }
 
 static PyObject *OdeObjectPy_get_p(OdeObjectPy *self, PyObject *Py_UNUSED(ignored)) {
@@ -162,18 +205,60 @@ static PyObject *OdeObjectPy_set_p(OdeObjectPy *self, PyObject *args, PyObject *
         PyErr_SetString(PyExc_RuntimeError, "Invalid ode");
         return NULL;
     }
-    char *kwlist[] = {"index", "value", NULL};
-    I index = 0;
-    R value = 0;
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "kd", kwlist, &index, &value)) {
+    char *kwlist[] = {"value", NULL};
+    PyObject *value = NULL;
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O", kwlist, &value)) {
         return NULL;
     }
-    if (index >= self->ode->p_size) {
-        PyErr_Format(PyExc_IndexError, "Index %d must be between 0 and %d", index, self->ode->p_size - 1);
+    
+    // Check if value is a sequence (list, tuple, etc.)
+    if (!PySequence_Check(value)) {
+        PyErr_SetString(PyExc_TypeError, "Value must be a sequence (list, tuple, etc.)");
         return NULL;
     }
-    self->ode->p[index] = value;
-    Py_RETURN_NONE;
+    
+    // Get the length of the sequence
+    Py_ssize_t seq_length = PySequence_Length(value);
+    if (seq_length < 0) {
+        return NULL; // Exception already set by PySequence_Length
+    }
+    
+    // Check if the sequence length matches the expected p_size
+    if (seq_length != self->ode->p_size) {
+        PyErr_Format(
+            PyExc_ValueError, 
+            "Sequence length must be %d, but got %zd", 
+            seq_length,
+            self->ode->p_size
+        );
+        return NULL;
+    }
+    
+    // Validate all elements are numbers and convert them to doubles
+    for (Py_ssize_t i = 0; i < seq_length; i++) {
+        PyObject *item = PySequence_GetItem(value, i);
+        if (!item) {
+            return NULL; // Exception already set
+        }
+        
+        // Convert to double
+        R double_value = PyFloat_AsDouble(item);
+        Py_DECREF(item);
+        
+        if (PyErr_Occurred()) {
+            // PyFloat_AsDouble failed, but let's provide a clearer error
+            PyErr_Format(
+                PyExc_ValueError, 
+                "Element at index %zd cannot be converted to float",
+                i
+            );
+            return NULL;
+        }
+        self->ode->p[i] = double_value;
+    }
+    
+    Py_INCREF(self);
+    return (PyObject *)self;
 }
 
 // OdeFactoryObjectPy implementation
