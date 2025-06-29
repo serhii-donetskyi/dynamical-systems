@@ -579,6 +579,10 @@ main {
     animation: progress-stripes 1s linear infinite;
 }
 
+.progress-section-fill.no-animation::after {
+    animation: none;
+}
+
 @keyframes progress-stripes {
     from {
         background-position: 0 0;

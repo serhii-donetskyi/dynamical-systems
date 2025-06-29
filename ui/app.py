@@ -161,6 +161,18 @@ def run_job(ode_name, solver_name, job_name):
         print(e, file=sys.stderr)
         print(traceback.format_exc(), file=sys.stderr)
         return jsonify({'error': str(e)}), 500
+    
+@app.route('/api/cancel-job/<job_id>', methods=['POST'])
+def cancel_job(job_id):
+    if job_id not in processes:
+        return jsonify({'error': 'Job not found'}), 404
+    process = processes[job_id]
+    process.terminate()
+    if process.poll() is None:
+        process.kill()
+        process.wait()
+    del processes[job_id]
+    return jsonify({'status': 'cancelled'})
 
 @app.route('/api/job-event-stream/<job_id>')
 def job_event_stream(job_id):
@@ -200,12 +212,11 @@ def job_event_stream(job_id):
             print(traceback.format_exc(), file=sys.stderr)
         finally:
             process.terminate()
-            try:
-                process.wait(timeout=5)
-            except subprocess.TimeoutExpired:
+            if process.poll() is None:
                 process.kill()
                 process.wait()
-        del processes[job_id]
+        if job_id in processes:
+            del processes[job_id]
     
     return Response(
         generate(),

@@ -25,6 +25,12 @@ const char* job(ode_t *restrict ode, solver_t *restrict solver, R *restrict data
     FILE *file = fopen(file_path, "w");
     if (!file) error = strerror(errno);
 
+    fprintf(file, "t");
+    for (I i = 0; i < ode->x_size; i++) {
+        fprintf(file, " x[%ld]", i);
+    }
+    fprintf(file, "\n");
+
     printf("%ld\n", progress);
     fflush(stdout);
 

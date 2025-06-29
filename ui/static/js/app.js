@@ -113,8 +113,8 @@ class DynamicalSystemsUI {
             this.runJob();
         });
 
-        this.components.action.testProgress.addEventListener('click', () => {
-            this.setLoading(true);
+        this.components.action.cancel.addEventListener('click', () => {
+            this.cancelJob();
         });
     }
     
@@ -403,6 +403,28 @@ class DynamicalSystemsUI {
         });
     }
 
+    cancelJob() {
+        // Close EventSource first to prevent onerror event
+        if (this.eventSource) {
+            this.eventSource.close();
+            this.eventSource = null;
+        }
+        this.components.progress.message.textContent = 'Canceled';
+
+        
+        this.fetchAPI(`/api/cancel-job/${this.jobId}`, {
+            method: 'POST'
+        })
+        .then(response => {
+            this.createPopUp('Job cancelled', true);
+            this.resetJobState();
+        })
+        .catch(error => {
+            this.createPopUp(`Error cancelling job: ${error}`, false);
+            this.resetJobState();
+        });
+    }
+
     resetJobState() {
         if (this.eventSource) {
             this.eventSource.close();
@@ -482,7 +504,6 @@ class DynamicalSystemsUI {
     }
     
     setLoading(isLoading) {
-        const container = this.components.container;
         const interactiveElements = [
             this.components.action.run,
             this.components.ode.dropdown,
@@ -495,12 +516,16 @@ class DynamicalSystemsUI {
             ...this.components.ode.state.parameters.querySelectorAll('input'),
         ]
         if (isLoading) {
-            container.classList.add('loading');
+            this.components.container.classList.add('loading');
+            this.components.action.cancel.disabled = false;
+            this.components.progress.fill.classList.remove('no-animation');
             interactiveElements.forEach(element => {
                 element.disabled = true;
             });
         } else {
-            container.classList.remove('loading');
+            this.components.container.classList.remove('loading');
+            this.components.action.cancel.disabled = true;
+            this.components.progress.fill.classList.add('no-animation');
             interactiveElements.forEach(element => {
                 element.disabled = false;
             });
