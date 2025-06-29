@@ -83,19 +83,19 @@ PyObject *py_parse_args(PyObject *args, PyObject *kwargs, const char *types, con
     Py_RETURN_NONE;
 }
 
-PyObject *py_get_dict_from_args(const char *types, const char *const *names, const void **src) {
+PyObject *py_get_list_from_args(const char *types, const char *const *names, const void **src) {
     if (!types || !names) {
         PyErr_SetString(PyExc_ValueError, "Invalid arguments to py_get_dict_from_args");
         return NULL;
     }
 
-    PyObject *dict = PyDict_New();
-    if (!dict) return NULL;
+    PyObject *list = PyList_New(0);
+    if (!list) return NULL;
     
     for (Py_ssize_t i = 0; types[i]; i++) {
         if (!names[i]){
             PyErr_Format(PyExc_TypeError, "Invalid argument name at index %zd", i);
-            Py_DECREF(dict);
+            Py_DECREF(list);
             return NULL;
         }
         PyObject *value = NULL;
@@ -158,19 +158,36 @@ PyObject *py_get_dict_from_args(const char *types, const char *const *names, con
                 break;
             default:
                 PyErr_Format(PyExc_TypeError, "Invalid argument type '%c' for argument '%s'", types[i], names[i]);
-                Py_DECREF(dict);
+                Py_DECREF(list);
                 return NULL;
         }
         if (!value) {
-            Py_DECREF(dict);
+            Py_DECREF(list);
             return NULL;
         }
-        if (PyDict_SetItemString(dict, names[i], value) < 0) {
+        PyObject* dict = PyDict_New();
+        PyObject* name = PyUnicode_FromString(names[i]);
+        if (!dict || !name) {
+            if (dict) Py_DECREF(dict);
+            if (name) Py_DECREF(name);
+            Py_DECREF(value);
+            Py_DECREF(list);
+            return NULL;
+        }
+        if (
+            PyList_Append(list, dict) < 0
+            || PyDict_SetItemString(dict, "name", name) < 0
+            || PyDict_SetItemString(dict, src ? "value" : "type", value) < 0
+        ) {
+            Py_DECREF(name);
             Py_DECREF(value);
             Py_DECREF(dict);
+            Py_DECREF(list);
             return NULL;
         }
-        Py_DECREF(value);
+        Py_DECREF(name); // name is in dict now
+        Py_DECREF(value); // value is in dict now
+        Py_DECREF(dict); // dict is in list now
     }
-    return dict;
+    return list;
 }

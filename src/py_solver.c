@@ -62,7 +62,7 @@ static PyObject *SolverObjectPy_get_arguments(SolverObjectPy *self, PyObject *Py
     }
     types[arg_size] = '\0';
     
-    return py_get_dict_from_args(types, names, src);
+    return py_get_list_from_args(types, names, src);
 }
 
 // SolverFactoryObjectPy implementation
@@ -190,7 +190,16 @@ static PyObject *SolverFactoryObjectPy_get_argument_types(SolverFactoryObjectPy 
     }
     types[arg_size] = '\0';
     
-    return py_get_dict_from_args(types, names, NULL);
+    return py_get_list_from_args(types, names, NULL);
+}
+
+// get_name() method: returns the factory name
+static PyObject *SolverFactoryObjectPy_get_name(SolverFactoryObjectPy *self, PyObject *Py_UNUSED(ignored)) {
+    if (!self->output || !self->output->name) {
+        PyErr_SetString(PyExc_RuntimeError, "Invalid output or name");
+        return NULL;
+    }
+    return PyUnicode_FromString(self->output->name);
 }
 
 // Method tables
@@ -203,6 +212,7 @@ static PyMethodDef SolverObjectPy_methods[] = {
 static PyMethodDef SolverFactoryObjectPy_methods[] = {
     {"create", (PyCFunction)(void(*)(void))SolverFactoryObjectPy_create, METH_VARARGS | METH_KEYWORDS, "Create a new Solver instance."},
     {"get_argument_types", (PyCFunction)SolverFactoryObjectPy_get_argument_types, METH_NOARGS, "Return a dictionary mapping argument names to their types."},
+    {"get_name", (PyCFunction)SolverFactoryObjectPy_get_name, METH_NOARGS, "Return the name of the Solver factory."},
     {NULL, NULL, 0, NULL}  /* Sentinel */
 };
 

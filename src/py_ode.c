@@ -67,7 +67,7 @@ static PyObject *OdeObjectPy_get_arguments(OdeObjectPy *self, PyObject *Py_UNUSE
     }
     types[arg_size] = '\0';
     
-    return py_get_dict_from_args(types, names, src);
+    return py_get_list_from_args(types, names, src);
 }
 
 static PyObject *OdeObjectPy_get_x_size(OdeObjectPy *self, PyObject *Py_UNUSED(ignored)) {
@@ -398,7 +398,16 @@ static PyObject *OdeFactoryObjectPy_get_argument_types(OdeFactoryObjectPy *self,
         names[i] = self->output->args[i].name;
     }
     types[arg_size] = '\0';
-    return py_get_dict_from_args(types, names, NULL);
+    return py_get_list_from_args(types, names, NULL);
+}
+
+// get_name() method: returns the factory name
+static PyObject *OdeFactoryObjectPy_get_name(OdeFactoryObjectPy *self, PyObject *Py_UNUSED(ignored)) {
+    if (!self->output || !self->output->name) {
+        PyErr_SetString(PyExc_RuntimeError, "Invalid output or name");
+        return NULL;
+    }
+    return PyUnicode_FromString(self->output->name);
 }
 
 // Method tables
@@ -419,6 +428,7 @@ static PyMethodDef OdeObjectPy_methods[] = {
 static PyMethodDef OdeFactoryObjectPy_methods[] = {
     {"create", (PyCFunction)(void(*)(void))OdeFactoryObjectPy_create, METH_VARARGS | METH_KEYWORDS, "Create a new ODE instance."},
     {"get_argument_types", (PyCFunction)OdeFactoryObjectPy_get_argument_types, METH_NOARGS, "Return a dictionary mapping argument names to their types."},
+    {"get_name", (PyCFunction)OdeFactoryObjectPy_get_name, METH_NOARGS, "Return the name of the ODE factory."},
     {NULL, NULL, 0, NULL}  /* Sentinel */
 };
 

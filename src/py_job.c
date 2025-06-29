@@ -83,7 +83,7 @@ static PyObject *JobObjectPy_get_argument_types(JobObjectPy *self, PyObject *Py_
     }
     types[arg_size + 2] = '\0';
     
-    return py_get_dict_from_args(types, names, NULL);
+    return py_get_list_from_args(types, names, NULL);
 }
 
 // run() method: executes the job with given ODE, solver, and arguments

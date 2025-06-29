@@ -12,7 +12,7 @@ const char* job(ode_t *restrict ode, solver_t *restrict solver, R *restrict data
 
     const R t_start = ode->t;
     I progress = 0;
-    I progress_prev = 0;
+    I progress_next = 0;
 
     const R t_end = args[0].r;
     const char *file_path = args[1].s;
@@ -31,10 +31,10 @@ const char* job(ode_t *restrict ode, solver_t *restrict solver, R *restrict data
         if (error) break;
         if (ode->t > t_end) break;
 
-        progress = (I)((ode->t - t_start) / (t_end - t_start) * 100);
-        if (progress > progress_prev) {
+        progress_next = (I)((ode->t - t_start) / (t_end - t_start) * 100);
+        while (progress < progress_next){
+            progress++;
             printf("%ld\n", progress);
-            progress_prev = progress;
         }
         
         // Write current state to file
@@ -51,12 +51,14 @@ const char* job(ode_t *restrict ode, solver_t *restrict solver, R *restrict data
         }
         solver->step(ode, solver, data);
     }
-    if (progress < 100) {
-        progress++;
-        printf("%ld\n", progress);
-    }
     if (steps >= MAX_STEPS) error = "Job has failed to finish in 1,000,000,000 steps";
     fclose(file);
+    if (!error){
+        while (progress < 100){
+            progress++;
+            printf("%ld\n", progress);
+        }
+    }
     return error;
 }
 
