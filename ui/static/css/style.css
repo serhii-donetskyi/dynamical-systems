@@ -551,7 +551,7 @@ main {
     box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.progress-fill {
+.progress-section-fill {
     height: 100%;
     background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
     width: 0%;
@@ -561,7 +561,7 @@ main {
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.progress-fill::after {
+.progress-section-fill::after {
     content: '';
     position: absolute;
     top: 0;

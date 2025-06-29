@@ -1,5 +1,4 @@
 import argparse
-import sys
 from . import components
 
 def parse_component_args(arg: str):    
@@ -72,7 +71,7 @@ Examples:
     parser.add_argument(
         '--solver',
         type=str,
-        default='rk4',
+        required=True,
         help='Solver to use (default: rk4)'
     )
     
@@ -87,7 +86,7 @@ Examples:
     parser.add_argument(
         '--job',
         type=str,
-        default='portrait',
+        required=True,
         help='Job to use (default: portrait)'
     )
 

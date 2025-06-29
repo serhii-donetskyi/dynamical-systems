@@ -26,6 +26,7 @@ const char* job(ode_t *restrict ode, solver_t *restrict solver, R *restrict data
     if (!file) error = strerror(errno);
 
     printf("%ld\n", progress);
+    fflush(stdout);
 
     for (; steps < MAX_STEPS; ++steps) {
         if (error) break;
@@ -35,6 +36,7 @@ const char* job(ode_t *restrict ode, solver_t *restrict solver, R *restrict data
         while (progress < progress_next){
             progress++;
             printf("%ld\n", progress);
+            fflush(stdout);
         }
         
         // Write current state to file
@@ -57,6 +59,7 @@ const char* job(ode_t *restrict ode, solver_t *restrict solver, R *restrict data
         while (progress < 100){
             progress++;
             printf("%ld\n", progress);
+            fflush(stdout);
         }
     }
     return error;
