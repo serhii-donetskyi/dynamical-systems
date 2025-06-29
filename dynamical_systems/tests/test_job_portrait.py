@@ -55,7 +55,7 @@ def test_errors(job, ode, solver):
     with pytest.raises(Exception):
         job.run(ode=ode, solver=solver, t_end=1.0, file_path=123)
 
-def test_progress(ode, solver, job):
+def test_modeule_call(ode, solver, job):
     t = ode.get_t()
     x = ode.get_x()
     p = ode.get_p()
