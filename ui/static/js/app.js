@@ -59,7 +59,8 @@ class DynamicalSystemsUI {
                 section: document.getElementById('action-section'),
                 run: document.getElementById('action-section-run-btn'),
                 cancel: document.getElementById('action-section-cancel-btn'),
-                testProgress: document.getElementById('action-section-test-progress-btn')
+                save: document.getElementById('action-section-save-config-btn'),
+                load: document.getElementById('action-section-load-config-btn'),
             },
             progress: {
                 section: document.getElementById('progress-section'),
@@ -105,7 +106,6 @@ class DynamicalSystemsUI {
         });
 
         this.components.ode.arguments.apply.addEventListener('click', () => {
-            this.components.ode.arguments.apply.disabled = true;
             this.generateStateFields();
         });
 
@@ -115,6 +115,14 @@ class DynamicalSystemsUI {
 
         this.components.action.cancel.addEventListener('click', () => {
             this.cancelJob();
+        });
+
+        this.components.action.save.addEventListener('click', () => {
+            this.saveConfig();
+        });
+
+        this.components.action.load.addEventListener('click', () => {
+            this.loadConfig();
         });
     }
     
@@ -245,6 +253,7 @@ class DynamicalSystemsUI {
     }
 
     async generateStateFields(){
+        this.components.ode.arguments.apply.disabled = true;
         const section = this.components.ode.state.section;
         const variables = this.components.ode.state.variables;
         const parameters = this.components.ode.state.parameters;
@@ -268,14 +277,14 @@ class DynamicalSystemsUI {
             // Generate variable fields
             if (stateData.variables) {
                 stateData.variables.forEach(({name: varName}) => {
-                    this.createStateField('variables', varName, '0');
+                    this.createStateField('variables', varName);
                 });
             }
             
             // Generate parameter fields
             if (stateData.parameters) {
                 stateData.parameters.forEach(({name: paramName}) => {
-                    this.createStateField('parameters', paramName, '0');
+                    this.createStateField('parameters', paramName);
                 });
             }
         } catch (error) {
@@ -283,7 +292,7 @@ class DynamicalSystemsUI {
         }
     }
 
-    createStateField(fieldType, fieldName, fieldValue) {
+    createStateField(fieldType, fieldName) {
         const container = this.components.ode.state[fieldType];
         
         const fieldDiv = document.createElement('div');
@@ -315,7 +324,7 @@ class DynamicalSystemsUI {
             this.checkIfRunReady();
         });
         
-        input.value = fieldValue;
+        input.value = stateValues[fieldName] || '0';
         input.dispatchEvent(new Event('input', { bubbles: true })); // Trigger input event to update UI
         
         const typeInfo = document.createElement('div');
@@ -509,6 +518,8 @@ class DynamicalSystemsUI {
             this.components.ode.dropdown,
             this.components.solver.dropdown,
             this.components.job.dropdown,
+            this.components.action.save,
+            this.components.action.load,
             ...this.components.ode.arguments.fields.querySelectorAll('input'),
             ...this.components.solver.arguments.fields.querySelectorAll('input'),
             ...this.components.job.arguments.fields.querySelectorAll('input'),
@@ -529,6 +540,131 @@ class DynamicalSystemsUI {
             interactiveElements.forEach(element => {
                 element.disabled = false;
             });
+        }
+    }
+
+    saveConfig() {
+        try {
+            // Create configuration object
+            const config = {
+                selectedComponents: this.selectedComponents,
+                componentConfigs: this.componentConfigs
+            };
+
+            // Convert to JSON string with pretty formatting
+            const configJSON = JSON.stringify(config, null, 2);
+            
+            // Create filename with timestamp
+            const filename = `dynamical-systems-config.json`;
+
+            // Download the file
+            this.downloadFile(filename, configJSON);
+            
+            this.createPopUp('Configuration saved successfully!', true);
+        } catch (error) {
+            console.error('Save config error:', error);
+            this.createPopUp(`Failed to save configuration: ${error.message}`, false);
+        }
+    }
+
+    loadConfig() {
+        // Create file input element
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = '.json';
+        fileInput.style.display = 'none';
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const config = JSON.parse(e.target.result);
+                    this.applyConfig(config);
+                    this.createPopUp('Configuration loaded successfully!', true);
+                } catch (error) {
+                    console.error('Load config error:', error);
+                    this.createPopUp(`Failed to load configuration: ${error.message}`, false);
+                }
+            };
+            reader.readAsText(file);
+            
+            // Clean up
+            document.body.removeChild(fileInput);
+        });
+
+        // Trigger file dialog
+        document.body.appendChild(fileInput);
+        fileInput.click();
+    }
+
+    applyConfig(config) {
+        try {
+            // Validate config structure
+            if (!config.selectedComponents || !config.componentConfigs) {
+                throw new Error('Invalid configuration file format');
+            }
+
+            // Store the loaded config
+            this.componentConfigs = config.componentConfigs || {};
+            this.selectedComponents = config.selectedComponents || { ode: null, solver: null, job: null };
+
+            // Restore UI state
+            this.restoreUIState();
+
+        } catch (error) {
+            throw new Error(`Configuration apply failed: ${error.message}`);
+        }
+    }
+
+    async restoreUIState() {
+        try {
+            // Restore dropdown selections and wait for async operations to complete
+            const restorePromises = Object.keys(this.selectedComponents).map(async (componentType) => {
+                const selectedValue = this.selectedComponents[componentType];
+                if (selectedValue) {
+                    const dropdown = this.components[componentType].dropdown;
+                    dropdown.value = selectedValue;
+                    
+                    // Generate argument fields and wait for completion
+                    await this.generateArgumentFields(componentType, selectedValue);
+                }
+            });
+
+            // Wait for all dropdown restorations to complete
+            await Promise.all(restorePromises);
+
+            // Now restore ODE state fields if needed
+            if (this.selectedComponents.ode) {
+                await this.generateStateFields();
+            }
+            
+            this.checkIfRunReady();
+
+        } catch (error) {
+            console.error('UI restore error:', error);
+            this.createPopUp(`Failed to restore UI state: ${error.message}`, false);
+        }
+    }
+
+    downloadFile(filename, fileContent) {
+        try {
+            const blob = new Blob([fileContent], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            return true;
+        } catch (error) {
+            console.error('Download file error:', error);
+            throw error;
         }
     }
 }
