@@ -3,78 +3,70 @@
 #include "py_solver.h"
 #include "core.h"
 #include <Python.h>
+#include <string.h>
 
-PyObject *py_parse_args(PyObject *args, PyObject *kwargs, const char *types, const char *const *names, void **dest) {
-    if (!types || !names || !dest) {
+argument_t *copy_args(const argument_t *restrict args) {
+    I arg_size = 0;
+    while (args[arg_size].name) arg_size++;
+    argument_t *copy = PyMem_Malloc(sizeof(argument_t) * (arg_size + 1));
+    if (!copy) return NULL;
+    memcpy(copy, args, sizeof(argument_t) * (arg_size + 1));
+    return copy;
+}
+
+PyObject *py_parse_args(PyObject *args, PyObject *kwargs, argument_t* args_out) {
+    if (!args_out) {
         PyErr_SetString(PyExc_ValueError, "Invalid arguments to py_parse_args");
         return NULL;
     }
 
     Py_ssize_t nargs = PyTuple_GET_SIZE(args);
-    for (Py_ssize_t i = 0; types[i]; i++) {
-        if (!names[i]){
-            PyErr_Format(PyExc_TypeError, "Invalid argument name at index %zd", i);
-            return NULL;
-        }
+    for (Py_ssize_t i = 0; args_out[i].name; i++) {
         
-        PyObject *arg = NULL;
+        PyObject *value = NULL;
         
         // Try to get argument from positional args first
         if (i < nargs) {
-            arg = PyTuple_GET_ITEM(args, i);
+            value = PyTuple_GET_ITEM(args, i);
         }
         // If not in positional args and we have keyword args, try to get from kwargs
         else if (kwargs) {
-            arg = PyDict_GetItemString(kwargs, names[i]);
+            value = PyDict_GetItemString(kwargs, args_out[i].name);
         }
 
         // If we still don't have an argument, it's an error
-        if (!arg) {
-            PyErr_Format(PyExc_TypeError, "Missing required argument '%s'", names[i]);
+        if (!value) {
+            PyErr_Format(PyExc_TypeError, "Missing required argument '%s'", args_out[i].name);
             return NULL;
         }
         
-        switch (types[i]) {
-            case 'i':
-                if (PyLong_Check(arg)) {
-                    *((I *)dest[i]) = PyLong_AsLong(arg);
+        switch (args_out[i].type) {
+            case INTEGER:
+                if (PyLong_Check(value)) {
+                    args_out[i].i = PyLong_AsLong(value);
                 } else {
-                    PyErr_Format(PyExc_TypeError, "Argument '%s' must be an integer", names[i]);
+                    PyErr_Format(PyExc_TypeError, "Argument '%s' must be an integer", args_out[i].name);
                     return NULL;
                 }
                 break;
-            case 'r':
-                if (PyFloat_Check(arg)) {
-                    *((R *)dest[i]) = PyFloat_AsDouble(arg);
+            case REAL:
+                if (PyFloat_Check(value)) {
+                    args_out[i].r = PyFloat_AsDouble(value);
                 } else {
-                    PyErr_Format(PyExc_TypeError, "Argument '%s' must be a real number", names[i]);
+                    PyErr_Format(PyExc_TypeError, "Argument '%s' must be a real number", args_out[i].name);
                     return NULL;
                 }
                 break;
-            case 's':
-                if (PyUnicode_Check(arg)) {
-                    *((const char **)dest[i]) = PyUnicode_AsUTF8(arg);
+            case STRING:
+                if (PyUnicode_Check(value)) {
+                    args_out[i].s = PyUnicode_AsUTF8(value);
                 } else {
-                    PyErr_Format(PyExc_TypeError, "Argument '%s' must be a string", names[i]);
+                    PyErr_Format(PyExc_TypeError, "Argument '%s' must be a string", args_out[i].name);
                     return NULL;
                 }
-                break;
-            case 'O':
-                if (!PyObject_IsInstance(arg, (PyObject *)&OdeTypePy)) {
-                    PyErr_Format(PyExc_TypeError, "Argument '%s' must be an Ode object", names[i]);
-                    return NULL;
-                }
-                *((PyObject **)dest[i]) = arg;
-                break;
-            case 'S':
-                if (!PyObject_IsInstance(arg, (PyObject *)&SolverTypePy)) {
-                    PyErr_Format(PyExc_TypeError, "Argument '%s' must be a Solver object", names[i]);
-                    return NULL;
-                }
-                *((PyObject **)dest[i]) = arg;
                 break;
             default:
-                PyErr_Format(PyExc_TypeError, "Invalid argument type '%c' for argument '%s'", types[i], names[i]);
+                PyErr_Format(PyExc_TypeError, "Invalid argument type '%c' for argument '%s'", args_out[i].type, args_out[i].name);
                 return NULL;
         }
         
@@ -83,81 +75,44 @@ PyObject *py_parse_args(PyObject *args, PyObject *kwargs, const char *types, con
     Py_RETURN_NONE;
 }
 
-PyObject *py_get_list_from_args(const char *types, const char *const *names, const void **src) {
-    if (!types || !names) {
-        PyErr_SetString(PyExc_ValueError, "Invalid arguments to py_get_dict_from_args");
+PyObject *py_get_list_from_args(const argument_t* args_in, I return_values) {
+    if (!args_in) {
+        PyErr_SetString(PyExc_ValueError, "Invalid arguments to py_get_list_from_args");
         return NULL;
     }
 
     PyObject *list = PyList_New(0);
     if (!list) return NULL;
     
-    for (Py_ssize_t i = 0; types[i]; i++) {
-        if (!names[i]){
-            PyErr_Format(PyExc_TypeError, "Invalid argument name at index %zd", i);
-            Py_DECREF(list);
-            return NULL;
-        }
+    for (Py_ssize_t i = 0; args_in[i].name; i++) {
         PyObject *value = NULL;
-        switch (types[i]) {
-            case 'i':
-                if (src) {
-                    value = PyLong_FromLong(*((I *)src[i]));
+        switch (args_in[i].type) {
+            case INTEGER:
+                if (return_values) {
+                    value = PyLong_FromLong(args_in[i].i);
                 } else {
                     value = (PyObject *)&PyLong_Type;
                     Py_INCREF(value);
                 }
                 break;
-            case 'r':
-                if (src) {
-                    value = PyFloat_FromDouble(*((R *)src[i]));
+            case REAL:
+                if (return_values) {
+                    value = PyFloat_FromDouble(args_in[i].r);
                 } else {
                     value = (PyObject *)&PyFloat_Type;
                     Py_INCREF(value);
                 }
                 break;
-            case 's':
-                if (src) {
-                    value = PyUnicode_FromString(*((char **)src[i]));
+            case STRING:
+                if (return_values) {
+                    value = PyUnicode_FromString(args_in[i].s);
                 } else {
                     value = (PyObject *)&PyUnicode_Type;
                     Py_INCREF(value);
                 }
                 break;
-            case 'O':
-                if (src) {
-                    value = *((PyObject **)src[i]);
-                    if (value) {
-                        Py_INCREF(value);
-                        if (!PyObject_IsInstance(value, (PyObject *)&OdeTypePy)) {
-                            PyErr_Format(PyExc_TypeError, "Argument '%s' must be an Ode object", names[i]);
-                            Py_DECREF(value);
-                            value = NULL;
-                        }
-                    }
-                } else {
-                    value = (PyObject *)&OdeTypePy;
-                    Py_INCREF(value);
-                }
-                break;
-            case 'S':
-                if (src) {
-                    value = *((PyObject **)src[i]);
-                    if (value) {
-                        Py_INCREF(value);
-                        if (!PyObject_IsInstance(value, (PyObject *)&SolverTypePy)) {
-                            PyErr_Format(PyExc_TypeError, "Argument '%s' must be a Solver object", names[i]);
-                            Py_DECREF(value);
-                            value = NULL;
-                        }
-                    }
-                } else {
-                    value = (PyObject *)&SolverTypePy;
-                    Py_INCREF(value);
-                }
-                break;
             default:
-                PyErr_Format(PyExc_TypeError, "Invalid argument type '%c' for argument '%s'", types[i], names[i]);
+                PyErr_Format(PyExc_TypeError, "Invalid argument type '%c' for argument '%s'", args_in[i].type, args_in[i].name);
                 Py_DECREF(list);
                 return NULL;
         }
@@ -166,7 +121,7 @@ PyObject *py_get_list_from_args(const char *types, const char *const *names, con
             return NULL;
         }
         PyObject* dict = PyDict_New();
-        PyObject* name = PyUnicode_FromString(names[i]);
+        PyObject* name = PyUnicode_FromString(args_in[i].name);
         if (!dict || !name) {
             if (dict) Py_DECREF(dict);
             if (name) Py_DECREF(name);
@@ -177,7 +132,7 @@ PyObject *py_get_list_from_args(const char *types, const char *const *names, con
         if (
             PyList_Append(list, dict) < 0
             || PyDict_SetItemString(dict, "name", name) < 0
-            || PyDict_SetItemString(dict, src ? "value" : "type", value) < 0
+            || PyDict_SetItemString(dict, return_values ? "value" : "type", value) < 0
         ) {
             Py_DECREF(name);
             Py_DECREF(value);

@@ -5,24 +5,24 @@ static const char* validate(const argument_t *restrict args) {
     return 0;
 }
 
-static void fn(R t, const R *restrict x, R *restrict dxdt, const R *restrict p, const argument_t *restrict args) {
+static void fn(const ode_t *restrict self, R t, const R *restrict x, R *restrict dxdt) {
     (void) t;
-    I n = args[0].i;
+    I n = self->args[0].i;
     for (I i = 0; i < n; i++) {
         dxdt[i] = 0;
         I k = i * n;
         for (I j = 0; j < n; j++) {
-            dxdt[i] += p[k + j] * x[j];
+            dxdt[i] += self->p[k + j] * x[j];
         }
     }
 }
 
-static I x_size(const argument_t* args) {
-    return args[0].i;
+static I x_size(const argument_t *restrict args) {
+    return args[0].i * sizeof(R);
 }
 
-static I p_size(const argument_t* args) {
-    return args[0].i * args[0].i;
+static I p_size(const argument_t *restrict args) {
+    return args[0].i * args[0].i * sizeof(R);
 }
 
 ode_output_t ode_output = {

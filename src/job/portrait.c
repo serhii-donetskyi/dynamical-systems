@@ -6,7 +6,8 @@
 
 #define MAX_STEPS 1000000000L
 
-const char* job(ode_t *restrict ode, solver_t *restrict solver, R *restrict data, const argument_t *restrict args) {
+
+static const char* job(ode_t *restrict ode, solver_t *restrict solver, const argument_t *restrict args) {
     char *error = 0;
     I steps = 0;
 
@@ -57,7 +58,7 @@ const char* job(ode_t *restrict ode, solver_t *restrict solver, R *restrict data
             }
             if (fprintf(file, "\n") < 0) error = "Failed to write to file";
         }
-        solver->step(ode, solver, data);
+        solver->step(solver, ode, &ode->t, ode->x, t_end);
     }
     if (steps >= MAX_STEPS) error = "Job has failed to finish in 1,000,000,000 steps";
     fclose(file);
@@ -73,7 +74,6 @@ const char* job(ode_t *restrict ode, solver_t *restrict solver, R *restrict data
 
 job_output_t job_output = {
     .name = "portrait",
-    .fn = job,
     .args = (argument_t[]){
         {
             .name = "t_end",
@@ -81,7 +81,7 @@ job_output_t job_output = {
             .r = 1.0,
         },
         {
-            .name = "file_path",
+            .name = "file",
             .type = STRING,
             .s = "portrait.dat",
         },
@@ -91,6 +91,7 @@ job_output_t job_output = {
             .i = 0,
         }
     },
+    .fn = job,
 };
 
 #undef MAX_STEPS
