@@ -6,6 +6,15 @@
 
 #define MAX_STEPS 1000000000L
 
+static const char *solout(FILE *file, const ode_t *ode) {
+    const char *error = "Failed to write to file";
+    if (fprintf(file, "%.6f", ode->t) < 0) return error;
+    for (I i = 0; i < ode->x_size; i++)
+        if (fprintf(file, " %.6f", ode->x[i]) < 0) return error;
+    if (fprintf(file, "\n") < 0) return error;
+    return 0;
+}
+
 static result_t job(ode_t *restrict ode, solver_t *restrict solver, const argument_t *restrict args) {
     result_t result = {.type = SUCCESS, .data = 0};
     I steps = 0;
@@ -37,11 +46,22 @@ static result_t job(ode_t *restrict ode, solver_t *restrict solver, const argume
         return result;
     }
 
-    fprintf(file, "t");
-    for (I i = 0; i < ode->x_size; i++) {
-        fprintf(file, " x[%ld]", i);
+    if (fprintf(file, "t") < 0) {
+        result.type = FAILURE;
+        result.message = "Failed to write to file";
     }
-    fprintf(file, "\n");
+    for (I i = 0; i < ode->x_size; i++) 
+        if (fprintf(file, " x[%ld]", i) < 0) {
+            result.type = FAILURE;
+            result.message = "Failed to write to file";
+            break;
+        }
+    if (fprintf(file, "\n") < 0) {
+        result.type = FAILURE;
+        result.message = "Failed to write to file";
+    }
+    result.message = solout(file, ode);
+    if (result.message) result.type = FAILURE;
 
     printf("%ld\n", progress);
     fflush(stdout);
@@ -56,27 +76,13 @@ static result_t job(ode_t *restrict ode, solver_t *restrict solver, const argume
             printf("%ld\n", progress);
             fflush(stdout);
         }
-        
-        // Write current state to file
-        if (fprintf(file, "%.6f", ode->t) < 0) {
-            result.type = FAILURE;
-            result.message = "Failed to write to file";
-            break;
-        } else{
-            for (I i = 0; i < ode->x_size; i++) {
-                if (fprintf(file, " %.6f", ode->x[i]) < 0){
-                    result.type = FAILURE;
-                    result.message = "Failed to write to file";
-                    break;
-                }
-            }
-            if (fprintf(file, "\n") < 0) {
-                result.type = FAILURE;
-                result.message = "Failed to write to file";
-                break;
-            }
-        }
         result.message = solver->step(solver, ode, &ode->t, ode->x, ode->t + h);
+        if (result.message) {
+            result.type = FAILURE;
+            break;
+        }
+        
+        result.message = solout(file, ode);
         if (result.message) {
             result.type = FAILURE;
             break;

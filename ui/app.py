@@ -7,7 +7,7 @@ A Flask web application for running dynamical systems simulations.
 from flask import Flask, render_template, request, jsonify, send_from_directory, Response
 from flask_cors import CORS
 import json
-import time
+import datetime
 import sys
 import traceback
 import subprocess
@@ -73,7 +73,6 @@ def get_job_arguments(name):
                 'type': arg['type'].__name__
             }
             for arg in components['job'][name].get_argument_types()
-            if arg['name'] not in ['ode', 'solver']
         ])
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -131,8 +130,6 @@ def run_job(ode_name, solver_name, job_name):
         for arg in job_types:
             name = arg['name']
             tp = arg['type']
-            if name in ['ode', 'solver']:
-                continue
             value = job_data['args'][name]
             job_kwargs[name] = tp(value)
 
@@ -142,13 +139,10 @@ def run_job(ode_name, solver_name, job_name):
         ode.set_p([float(ode_data['parameters'][f'p[{i}]']) for i in range(ode.get_p_size())])
 
         solver = components['solver'][solver_name].create(**solver_kwargs)
-        job = components['job'][job_name]
+        job = components['job'][job_name].create(**job_kwargs)
 
-        job_kwargs['ode'] = ode
-        job_kwargs['solver'] = solver
-        
         process = subprocess.Popen(
-            generate_module_cmd(job, job_kwargs),
+            generate_module_cmd(ode, solver, job),
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
@@ -196,13 +190,55 @@ def job_event_stream(job_id):
             yield f"data: {json.dumps(status)}\n\n"
             return
         try:
+            timestamps = []
             for line in process.stdout:
                 progress = int(line.strip())
+                timestamps.append(datetime.datetime.now())
+                message = None
+                if progress == 0:
+                    message = 'Job started'
+                elif progress == 100:
+                    message = 'Job finished'
+                else:
+                    diffs = [timestamps[i+1] - timestamps[i] for i in range(len(timestamps) - 1)]
+                    avg_diff = sum(diffs, datetime.timedelta()) / len(diffs)
+                    time_remaining = (100 - progress) * avg_diff
+                    
+                    # Extract time components
+                    total_seconds = int(time_remaining.total_seconds())
+                    days = total_seconds // 86400
+                    hours = (total_seconds % 86400) // 3600
+                    minutes = (total_seconds % 3600) // 60
+                    seconds = total_seconds % 60
+                    
+                    # Create list of non-zero components
+                    components = []
+                    if days > 0:
+                        components.append((days, 'day' if days == 1 else 'days'))
+                    if hours > 0:
+                        components.append((hours, 'hour' if hours == 1 else 'hours'))
+                    if minutes > 0:
+                        components.append((minutes, 'minute' if minutes == 1 else 'minutes'))
+                    if seconds > 0:
+                        components.append((seconds, 'second' if seconds == 1 else 'seconds'))
+                    
+                    # Get the biggest and second biggest components
+                    if len(components) >= 2:
+                        biggest = components[0]
+                        second_biggest = components[1]
+                        time_str = f'{biggest[0]} {biggest[1]}, {second_biggest[0]} {second_biggest[1]}'
+                    elif len(components) == 1:
+                        biggest = components[0]
+                        time_str = f'{biggest[0]} {biggest[1]}'
+                    else:
+                        time_str = 'less than a second'
+                    
+                    message = f'Calculating... {time_str} remaining'
                 if progress > 100:
                     raise ValueError(f"Progress is greater than 100: {progress}")
                 status['progress'] = progress
                 status['status'] = 'running' if progress < 100 else 'completed'
-                status['message'] = f'Processing...' if progress < 100 else 'Job finished'
+                status['message'] = message
                 yield f"data: {json.dumps(status)}\n\n"
         except Exception as e:
             status['status'] = 'error'
