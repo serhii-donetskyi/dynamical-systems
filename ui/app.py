@@ -133,13 +133,21 @@ def run_job(ode_name, solver_name, job_name):
             value = job_data['args'][name]
             job_kwargs[name] = tp(value)
 
-        ode = components['ode'][ode_name].create(**ode_kwargs)
-        ode.set_t(float(ode_data['variables']['t']))
-        ode.set_x([float(ode_data['variables'][f'x[{i}]']) for i in range(ode.get_x_size())])
-        ode.set_p([float(ode_data['parameters'][f'p[{i}]']) for i in range(ode.get_p_size())])
-
-        solver = components['solver'][solver_name].create(**solver_kwargs)
-        job = components['job'][job_name].create(**job_kwargs)
+        try: 
+            ode = components['ode'][ode_name].create(**ode_kwargs)
+            ode.set_t(float(ode_data['variables']['t']))
+            ode.set_x([float(ode_data['variables'][f'x[{i}]']) for i in range(ode.get_x_size())])
+            ode.set_p([float(ode_data['parameters'][f'p[{i}]']) for i in range(ode.get_p_size())])
+        except Exception as e:
+            raise type(e)(f'ODE Error: {e}') from e
+        try:
+            solver = components['solver'][solver_name].create(**solver_kwargs)
+        except Exception as e:
+            raise type(e)(f'Solver Error: {e}') from e
+        try:
+            job = components['job'][job_name].create(**job_kwargs)
+        except Exception as e:
+            raise type(e)(f'Job Error: {e}') from e
 
         process = subprocess.Popen(
             generate_module_cmd(ode, solver, job),

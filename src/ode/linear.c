@@ -38,7 +38,9 @@ ode_output_t ode_output = {
 
 static result_t create(const argument_t *restrict args) {
     const I n = args[0].i;
-    if (n <= 0) return (result_t){.type = FAILURE, .message = "n must be positive"};
+    if (n <= 0 || n > 100) {
+        return (result_t){.type = FAILURE, .message = "n must satisfy: 0 < n <= 100"};
+    }
 
     const I x_size = n;
     const I p_size = n * n;

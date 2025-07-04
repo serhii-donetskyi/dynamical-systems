@@ -407,7 +407,7 @@ class DynamicalSystemsUI {
             };
         })
         .catch(error => {
-            this.createPopUp(`Error starting mock job: ${error}`, false);
+            this.createPopUp(`${error}`, false);
             this.resetJobState();
         });
     }

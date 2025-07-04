@@ -23,13 +23,13 @@ static result_t job(ode_t *restrict ode, solver_t *restrict solver, const argume
     I progress = 0;
     I progress_next = 0;
 
-    const R h = args[0].r;
+    const R t_step = args[0].r;
     const R t_end = args[1].r;
     const char *file_path = args[2].s;
 
-    if (h <= 0) {
+    if (t_step <= 0) {
         result.type = FAILURE;
-        result.message = "h must be positive";
+        result.message = "t_step must be positive";
         return result;
     }
 
@@ -68,7 +68,7 @@ static result_t job(ode_t *restrict ode, solver_t *restrict solver, const argume
 
     for (; steps < MAX_STEPS; ++steps) {
         if (result.type == FAILURE) break;
-        if (ode->t > t_end) break;
+        if (ode->t >= t_end) break;
 
         progress_next = (I)((ode->t - t_start) / (t_end - t_start) * 100);
         while (progress < progress_next){
@@ -76,7 +76,7 @@ static result_t job(ode_t *restrict ode, solver_t *restrict solver, const argume
             printf("%ld\n", progress);
             fflush(stdout);
         }
-        result.message = solver->step(solver, ode, &ode->t, ode->x, ode->t + h);
+        result.message = solver->step(solver, ode, &ode->t, ode->x, ode->t + t_step);
         if (result.message) {
             result.type = FAILURE;
             break;
@@ -107,7 +107,7 @@ job_output_t job_output = {
     .name = "portrait",
     .args = (argument_t[]){
         {
-            .name = "h",
+            .name = "t_step",
             .type = REAL,
             .r = 0.01,
         },
