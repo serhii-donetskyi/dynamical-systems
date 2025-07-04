@@ -6,11 +6,91 @@
 #include <dlfcn.h>  // For RTLD_LAZY
 #include <string.h>
 
+
 // JobObjectPy implementation
 static PyObject *JobObjectPy_new(PyTypeObject *type, PyObject *args, PyObject *kwds) {
     (void)args;
     (void)kwds;
     JobObjectPy *self = (JobObjectPy *)type->tp_alloc(type, 0);
+    if (!self) return NULL;
+    return (PyObject *)self;
+}
+
+static int JobObjectPy_init(JobObjectPy *self, PyObject *args, PyObject *kwds) {
+    (void)self;
+    (void)args;
+    (void)kwds;
+    PyErr_SetString(PyExc_NotImplementedError, "Direct Job() construction is not supported. Use a factory class instead.");
+    return -1;
+}
+
+static void JobObjectPy_dealloc(JobObjectPy *self) {
+    if (self->args) {
+        PyMem_Free(self->args);
+        self->args = NULL;
+    }
+    if (self->factory) Py_DECREF(self->factory);
+    self->factory = NULL;
+    Py_TYPE(self)->tp_free((PyObject *)self);
+}
+
+// run() method: executes the job with given ODE, solver, and arguments
+static PyObject *JobObjectPy_run(JobObjectPy *self, PyObject *args, PyObject *kwargs) {
+    if (!self->factory || !self->args) {
+        PyErr_SetString(PyExc_RuntimeError, "Invalid job state");
+        return NULL;
+    }
+
+    OdeObjectPy *ode_obj = NULL;
+    SolverObjectPy *solver_obj = NULL;
+
+    char *kwlist[] = {"ode", "solver", NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O!O!", kwlist, &OdeTypePy, &ode_obj, &SolverTypePy, &solver_obj)) {
+        return NULL;
+    }
+    if (!ode_obj->ode || !solver_obj->solver) {
+        PyErr_SetString(PyExc_RuntimeError, "Invalid ODE or solver");
+        return NULL;
+    }
+
+    result_t result = solver_obj->solver->set_data(solver_obj->solver, ode_obj->ode);
+    if (result.type == FAILURE) {
+        PyErr_SetString(PyExc_RuntimeError, result.message);
+        return NULL;
+    }
+
+    result = self->factory->output->fn(ode_obj->ode, solver_obj->solver, self->args);
+    if (result.type == FAILURE) {
+        PyErr_SetString(PyExc_RuntimeError, result.message);
+        return NULL;
+    }
+
+    Py_RETURN_NONE;
+}
+
+static PyObject *JobObjectPy_get_arguments(JobObjectPy *self, PyObject *Py_UNUSED(ignored)) {
+    if (!self->args) {
+        PyErr_SetString(PyExc_RuntimeError, "Invalid job");
+        return NULL;
+    }
+    return py_get_list_from_args(self->args, 1);
+}
+
+static PyObject* JobObjectPy_get_factory(JobObjectPy *self, PyObject *Py_UNUSED(ignored)) {
+    if (!self->factory) {
+        PyErr_SetString(PyExc_RuntimeError, "Name not set");
+        return NULL;
+    }
+    Py_INCREF(self->factory);
+    return (PyObject *)self->factory;
+}
+
+
+// JobFactoryObjectPy implementation
+static PyObject *JobFactoryObjectPy_new(PyTypeObject *type, PyObject *args, PyObject *kwds) {
+    (void)args;
+    (void)kwds;
+    JobFactoryObjectPy *self = (JobFactoryObjectPy *)type->tp_alloc(type, 0);
     if (!self) {
         return NULL;
     }
@@ -19,7 +99,7 @@ static PyObject *JobObjectPy_new(PyTypeObject *type, PyObject *args, PyObject *k
     return (PyObject *)self;
 }
 
-static int JobObjectPy_init(JobObjectPy *self, PyObject *args, PyObject *kwds) {
+static int JobFactoryObjectPy_init(JobFactoryObjectPy *self, PyObject *args, PyObject *kwds) {
     char *kwlist[] = {"libpath", NULL};
     const char *libpath = NULL;
     if (!PyArg_ParseTupleAndKeywords(args, kwds, "s", kwlist, &libpath)) {
@@ -36,12 +116,14 @@ static int JobObjectPy_init(JobObjectPy *self, PyObject *args, PyObject *kwds) {
         dlclose(handle);
         return -1;
     }
+    output->malloc = PyMem_Malloc;
+    output->free = PyMem_Free;
     self->output = output;
     self->handle = handle;
     return 0;
 }
 
-static void JobObjectPy_dealloc(JobObjectPy *self) {
+static void JobFactoryObjectPy_dealloc(JobFactoryObjectPy *self) {
     if (self->handle) {
         dlclose(self->handle);
         self->handle = NULL;
@@ -51,7 +133,7 @@ static void JobObjectPy_dealloc(JobObjectPy *self) {
 }
 
 // get_name() method: returns the job name
-static PyObject *JobObjectPy_get_name(JobObjectPy *self, PyObject *Py_UNUSED(ignored)) {
+static PyObject *JobFactoryObjectPy_get_name(JobFactoryObjectPy *self, PyObject *Py_UNUSED(ignored)) {
     if (!self->output || !self->output->name) {
         PyErr_SetString(PyExc_RuntimeError, "Name not set");
         return NULL;
@@ -60,106 +142,42 @@ static PyObject *JobObjectPy_get_name(JobObjectPy *self, PyObject *Py_UNUSED(ign
 }
 
 // get_argument_types() method: returns a dictionary mapping argument names to their types
-static PyObject *JobObjectPy_get_argument_types(JobObjectPy *self, PyObject *Py_UNUSED(ignored)) {
-    if (!self->output || !self->output->args) {
-        PyErr_SetString(PyExc_RuntimeError, "Invalid output or arguments");
-        return NULL;
-    }
-    I arg_size = 0;
-    while (self->output->args[arg_size].name) arg_size++;
-    
-    // Create type string and names array (including ode and solver)
-    char types[arg_size + 3];  // +2 for ode/solver, +1 for null terminator
-    char const *names[arg_size + 2];
-    
-    types[0] = 'O';
-    names[0] = "ode";
-    types[1] = 'S';
-    names[1] = "solver";
-    
-    for (I i = 0; i < arg_size; i++) {
-        types[i+2] = (char)self->output->args[i].type;
-        names[i+2] = self->output->args[i].name;
-    }
-    types[arg_size + 2] = '\0';
-    
-    return py_get_list_from_args(types, names, NULL);
+static PyObject *JobFactoryObjectPy_get_argument_types(JobFactoryObjectPy *self, PyObject *Py_UNUSED(ignored)) {
+    return py_get_list_from_args(self->output->args, 0);
 }
 
-// run() method: executes the job with given ODE, solver, and arguments
-static PyObject *JobObjectPy_run(JobObjectPy *self, PyObject *args, PyObject *kwargs) {
-    if (!self->output || !self->output->fn || !self->output->args) {
-        PyErr_SetString(PyExc_RuntimeError, "Invalid job state");
+static PyObject *JobFactoryObjectPy_create(JobFactoryObjectPy *self, PyObject *args, PyObject *kwargs) {
+    if (!self->output) {
+        PyErr_SetString(PyExc_RuntimeError, "Invalid job factory");
         return NULL;
     }
+    argument_t *job_args = py_copy_and_parse_args(args, kwargs, self->output->args);
+    if (!job_args) return NULL;
 
-    PyObject *ode_obj = NULL;
-    PyObject *solver_obj = NULL;
-
-    I arg_size = 0;
-    while (self->output->args[arg_size].name) arg_size++;
-    
-    // Create type string and arrays (including ode and solver)
-    argument_t _args[arg_size + 1];
-    memcpy(_args, self->output->args, sizeof(argument_t) * (arg_size + 1));
-
-    char types[arg_size + 3];  // +2 for ode/solver, +1 for null terminator
-    char const* names[arg_size + 2];
-    void* dest[arg_size + 2];
-    
-    types[0] = 'O';
-    names[0] = "ode";
-    dest[0] = &ode_obj;
-    types[1] = 'S';
-    names[1] = "solver";
-    dest[1] = &solver_obj;
-    
-    for (I i = 0; i < arg_size; i++) {
-        types[i+2] = (char)_args[i].type;
-        names[i+2] = _args[i].name;
-        dest[i+2] = &_args[i].i;
-    }
-    types[arg_size + 2] = '\0';
-    
-    if (!py_parse_args(args, kwargs, types, names, dest)){
+    JobObjectPy *job_obj = (JobObjectPy *)JobTypePy.tp_alloc(&JobTypePy, 0);
+    if (!job_obj) {
+        PyErr_SetString(PyExc_RuntimeError, "Failed to allocate job object");
+        PyMem_Free(job_args);
         return NULL;
     }
-
-    OdeObjectPy *ode_py = (OdeObjectPy *)ode_obj;
-    SolverObjectPy *solver_py = (SolverObjectPy *)solver_obj;
-
-    if (!ode_py->ode || !solver_py->solver) {
-        PyErr_SetString(PyExc_RuntimeError, "Invalid ODE or Solver object");
-        return NULL;
-    }
-
-    // Allocate data
-    I data_size = solver_py->solver->data_size(ode_py->ode);
-    R *data = PyMem_Malloc(sizeof(R) * data_size);
-    if (!data) {
-        PyErr_SetString(PyExc_RuntimeError, "Failed to allocate data");
-        return NULL;
-    }
-
-    // Call the job function
-    const char* error = self->output->fn(ode_py->ode, solver_py->solver, data, _args);
-
-    // Free data
-    PyMem_Free(data);
-
-    // Check for errors
-    if (error) {
-        PyErr_SetString(PyExc_RuntimeError, error);
-        return NULL;
-    }
-    Py_RETURN_NONE;
+    Py_INCREF(self);
+    job_obj->factory = self;
+    job_obj->args = job_args;
+    return (PyObject *)job_obj;
 }
 
 // Method table
 static PyMethodDef JobObjectPy_methods[] = {
-    {"get_name", (PyCFunction)JobObjectPy_get_name, METH_NOARGS, "Return the name of the Job."},
-    {"get_argument_types", (PyCFunction)JobObjectPy_get_argument_types, METH_NOARGS, "Return a dictionary mapping argument names to their types."},
     {"run", (PyCFunction)(void(*)(void))JobObjectPy_run, METH_VARARGS | METH_KEYWORDS, "Run the job with given ODE, solver, and arguments."},
+    {"get_arguments", (PyCFunction)(void(*)(void))JobObjectPy_get_arguments, METH_NOARGS, "Return the arguments of the job."},
+    {"get_factory", (PyCFunction)(void(*)(void))JobObjectPy_get_factory, METH_NOARGS, "Return the factory object."},
+    {NULL, NULL, 0, NULL}  /* Sentinel */
+};
+
+static PyMethodDef JobFactoryObjectPy_methods[] = {
+    {"create", (PyCFunction)(void(*)(void))JobFactoryObjectPy_create, METH_VARARGS | METH_KEYWORDS, "Create a Job object."},
+    {"get_name", (PyCFunction)JobFactoryObjectPy_get_name, METH_NOARGS, "Return the name of the Job."},
+    {"get_argument_types", (PyCFunction)JobFactoryObjectPy_get_argument_types, METH_NOARGS, "Return a dictionary mapping argument names to their types."},
     {NULL, NULL, 0, NULL}  /* Sentinel */
 };
 
@@ -177,4 +195,16 @@ PyTypeObject JobTypePy = {
     .tp_doc = "Job object wrapping a C job_output_t struct",
 };
 
+PyTypeObject JobFactoryTypePy = {
+    PyVarObject_HEAD_INIT(NULL, 0)
+    .tp_name = "dynamical_systems.JobFactory",
+    .tp_basicsize = sizeof(JobFactoryObjectPy),
+    .tp_itemsize = 0,
+    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+    .tp_new = JobFactoryObjectPy_new,
+    .tp_init = (initproc)JobFactoryObjectPy_init,
+    .tp_dealloc = (destructor)JobFactoryObjectPy_dealloc,
+    .tp_methods = JobFactoryObjectPy_methods,
+    .tp_doc = "Job factory object wrapping a C job_output_t struct",
+};
 

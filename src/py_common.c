@@ -1,24 +1,16 @@
+#include "core.h"
 #include "py_common.h"
 #include "py_ode.h"
 #include "py_solver.h"
-#include "core.h"
 #include <Python.h>
 #include <string.h>
 
-argument_t *copy_args(const argument_t *restrict args) {
+argument_t *py_copy_and_parse_args(PyObject *args, PyObject *kwargs, const argument_t* args_in) {
     I arg_size = 0;
-    while (args[arg_size].name) arg_size++;
-    argument_t *copy = PyMem_Malloc(sizeof(argument_t) * (arg_size + 1));
-    if (!copy) return NULL;
-    memcpy(copy, args, sizeof(argument_t) * (arg_size + 1));
-    return copy;
-}
-
-PyObject *py_parse_args(PyObject *args, PyObject *kwargs, argument_t* args_out) {
-    if (!args_out) {
-        PyErr_SetString(PyExc_ValueError, "Invalid arguments to py_parse_args");
-        return NULL;
-    }
+    while (args_in[arg_size].name) arg_size++;
+    argument_t *args_out = PyMem_Malloc(sizeof(argument_t) * (arg_size + 1));
+    if (!args_out) return NULL;
+    memcpy(args_out, args_in, sizeof(argument_t) * (arg_size + 1));
 
     Py_ssize_t nargs = PyTuple_GET_SIZE(args);
     for (Py_ssize_t i = 0; args_out[i].name; i++) {
@@ -72,7 +64,7 @@ PyObject *py_parse_args(PyObject *args, PyObject *kwargs, argument_t* args_out) 
         
         if (PyErr_Occurred()) return NULL;
     }
-    Py_RETURN_NONE;
+    return args_out;
 }
 
 PyObject *py_get_list_from_args(const argument_t* args_in, I return_values) {

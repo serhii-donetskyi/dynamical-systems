@@ -1,4 +1,5 @@
 #include "py_solver.h"
+#include "py_ode.h"
 #include "py_common.h"
 #include <stdlib.h>
 #include <dlfcn.h>  // For RTLD_LAZY
@@ -9,11 +10,9 @@ static PyObject *SolverObjectPy_new(PyTypeObject *type, PyObject *args, PyObject
     (void)args;
     (void)kwds;
     SolverObjectPy *self = (SolverObjectPy *)type->tp_alloc(type, 0);
-    if (!self) {
-        return NULL;
-    }
-    self->factory = NULL;  // Initialize to NULL
-    self->solver = NULL;  // Initialize to NULL
+    if (!self) return NULL;
+    self->factory = NULL;
+    self->solver = NULL;
     return (PyObject *)self;
 }
 
@@ -27,8 +26,7 @@ static int SolverObjectPy_init(SolverObjectPy *self, PyObject *args, PyObject *k
 
 static void SolverObjectPy_dealloc(SolverObjectPy *self) {
     if (self->solver) {
-        if (self->solver->args) PyMem_Free((void *)self->solver->args);
-        if (self->solver) PyMem_Free(self->solver);
+        PyMem_Free((void *)self->solver);
         self->solver = NULL;
     }
     if (self->factory) Py_DECREF(self->factory);
@@ -50,19 +48,7 @@ static PyObject *SolverObjectPy_get_arguments(SolverObjectPy *self, PyObject *Py
         PyErr_SetString(PyExc_RuntimeError, "Invalid solver");
         return NULL;
     }
-    I arg_size = 0;
-    while (self->solver->args[arg_size].name) arg_size++;
-    char types[arg_size + 1];
-    const char* names[arg_size];
-    const void* src[arg_size];
-    for (I i = 0; i < arg_size; i++) {
-        types[i] = (char)self->solver->args[i].type;
-        names[i] = self->solver->args[i].name;
-        src[i] = &self->solver->args[i].i;
-    }
-    types[arg_size] = '\0';
-    
-    return py_get_list_from_args(types, names, src);
+    return py_get_list_from_args(self->solver->args, 1);
 }
 
 // SolverFactoryObjectPy implementation
@@ -95,6 +81,8 @@ static int SolverFactoryObjectPy_init(SolverFactoryObjectPy *self, PyObject *arg
         dlclose(handle);
         return -1;
     }
+    output->malloc = PyMem_Malloc;
+    output->free = PyMem_Free;
     self->output = output;
     self->handle = handle;
     return 0;
@@ -109,69 +97,52 @@ static void SolverFactoryObjectPy_dealloc(SolverFactoryObjectPy *self) {
     Py_TYPE(self)->tp_free((PyObject *)self);
 }
 
+static PyObject *SolverObjectPy_set_data(SolverObjectPy *self, PyObject *args, PyObject *kwargs) {
+    if (!self->solver) {
+        PyErr_SetString(PyExc_RuntimeError, "Invalid solver");
+        return NULL;
+    }
+    char *kwlist[] = {"ode", NULL};
+    OdeObjectPy *ode = NULL;
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O!", kwlist, &OdeTypePy, &ode)) {
+        return NULL;
+    }
+    result_t result = self->solver->set_data(self->solver, ode->ode);
+    if (result.type == FAILURE) {
+        PyErr_SetString(PyExc_RuntimeError, result.message);
+        return NULL;
+    }
+    Py_RETURN_NONE;
+}
+
 // Factory method to create a SolverObjectPy
 static PyObject *SolverFactoryObjectPy_create(SolverFactoryObjectPy *self, PyObject *args, PyObject *kwargs) {
-    if (!self->output || !self->output->name || !self->output->data_size || 
-        !self->output->step || !self->output->args || !self->output->validate) {
+    if (!self->output || !self->output->name || !self->output->args) {
         PyErr_SetString(PyExc_RuntimeError, "Invalid factory state");
         return NULL;
     }
+    argument_t *solver_args = py_copy_and_parse_args(args, kwargs, self->output->args);
+    if (!solver_args) return NULL;
 
-    I arg_size = 0;
-    while (self->output->args[arg_size].name) arg_size++;
-    // Allocate memory for arguments
-    argument_t *_args = PyMem_Malloc(sizeof(argument_t) * (arg_size + 1));
-    if (!_args) {
-        PyErr_SetString(PyExc_MemoryError, "Failed to allocate memory for arguments");
-        return NULL;
-    }
-    memcpy(_args, self->output->args, sizeof(argument_t) * (arg_size + 1));
-    // Create type string and arrays
-    char types[arg_size + 1]; // +1 for null terminator
-    const char* names[arg_size];
-    void* dest[arg_size];
-    for (I i = 0; i < arg_size; i++) {
-        types[i] = (char)_args[i].type;
-        names[i] = _args[i].name;
-        dest[i] = &_args[i].i;
-    }
-    types[arg_size] = '\0';
+    result_t result = self->output->create(solver_args);
+    PyMem_Free(solver_args); // solver_args are copied into the solver
     
-    if (!py_parse_args(args, kwargs, types, names, dest)){
+    if (result.type == FAILURE) {
+        PyErr_SetString(PyExc_RuntimeError, result.message);
         return NULL;
     }
-
-    const char* error = self->output->validate(_args);
-    if (error) {
-        PyErr_SetString(PyExc_RuntimeError, error);
+    solver_t *solver = (solver_t *)result.data;
+    SolverObjectPy *solver_obj = (SolverObjectPy *)SolverTypePy.tp_alloc(&SolverTypePy, 0);
+    if (!solver || !solver_obj) {
+        if (solver) self->output->destroy(solver);
+        if (solver_obj) Py_DECREF(solver_obj);
+        PyErr_SetString(PyExc_RuntimeError, "Failed to allocate memory");
         return NULL;
     }
-
-    // Create Solver object
-    SolverObjectPy *py_solver = (SolverObjectPy *)SolverTypePy.tp_alloc(&SolverTypePy, 0);
-    py_solver->factory = self;
     Py_INCREF(self);
-    // Allocate and initialize Solver structure
-    solver_t *solver = PyMem_Malloc(sizeof(solver_t));
-
-    if (!py_solver || !solver || !_args) {
-        PyErr_SetString(PyExc_RuntimeError, "Failed to create Solver");
-        if (py_solver) Py_DECREF(py_solver);
-        if (solver) PyMem_Free(solver);
-        if (_args) PyMem_Free(_args);
-        return NULL;
-    }
-
-    // Copy everything to solver
-    solver_t tmp = {
-        .args = _args,
-        .data_size = self->output->data_size,
-        .step = self->output->step,
-    };
-    memcpy(solver, &tmp, sizeof(solver_t));
-    py_solver->solver = solver;
-
-    return (PyObject *)py_solver;
+    solver_obj->factory = self;
+    solver_obj->solver = solver;
+    return (PyObject *)solver_obj;
 }
 
 // get_argument_types() method: returns a dictionary mapping argument names to their types
@@ -180,17 +151,7 @@ static PyObject *SolverFactoryObjectPy_get_argument_types(SolverFactoryObjectPy 
         PyErr_SetString(PyExc_RuntimeError, "Invalid output or arguments");
         return NULL;
     }
-    I arg_size = 0;
-    while (self->output->args[arg_size].name) arg_size++;
-    char types[arg_size + 1];
-    const char* names[arg_size];
-    for (I i = 0; i < arg_size; i++) {
-        types[i] = (char)self->output->args[i].type;
-        names[i] = self->output->args[i].name;
-    }
-    types[arg_size] = '\0';
-    
-    return py_get_list_from_args(types, names, NULL);
+    return py_get_list_from_args(self->output->args, 0);
 }
 
 // get_name() method: returns the factory name
@@ -206,6 +167,7 @@ static PyObject *SolverFactoryObjectPy_get_name(SolverFactoryObjectPy *self, PyO
 static PyMethodDef SolverObjectPy_methods[] = {
     {"get_factory", (PyCFunction)SolverObjectPy_get_factory, METH_NOARGS, "Return the factory of the Solver."},
     {"get_arguments", (PyCFunction)SolverObjectPy_get_arguments, METH_NOARGS, "Get arguments of the Solver."},
+    {"set_data", (PyCFunction)(void(*)(void))SolverObjectPy_set_data, METH_VARARGS | METH_KEYWORDS, "Set data of the Solver."},
     {NULL, NULL, 0, NULL}  /* Sentinel */
 };
 

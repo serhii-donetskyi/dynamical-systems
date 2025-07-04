@@ -25,6 +25,7 @@ PyMODINIT_FUNC PyInit__dynamical_systems(void) {
     if (PyType_Ready(&OdeFactoryTypePy) < 0) return NULL;
     if (PyType_Ready(&SolverTypePy) < 0) return NULL;
     if (PyType_Ready(&SolverFactoryTypePy) < 0) return NULL;
+    if (PyType_Ready(&JobFactoryTypePy) < 0) return NULL;
     if (PyType_Ready(&JobTypePy) < 0) return NULL;
 
     m = PyModule_Create(&dynamical_systems_module_def);
@@ -67,6 +68,19 @@ PyMODINIT_FUNC PyInit__dynamical_systems(void) {
     Py_INCREF(&JobTypePy);
     if (PyModule_AddObject(m, "Job", (PyObject *)&JobTypePy) < 0) {
         Py_DECREF(&JobTypePy);
+        Py_DECREF(&SolverFactoryTypePy);
+        Py_DECREF(&SolverTypePy);
+        Py_DECREF(&OdeFactoryTypePy);
+        Py_DECREF(&OdeTypePy);
+        Py_DECREF(m);
+        return NULL;
+    }
+
+    Py_INCREF(&JobFactoryTypePy);
+    if (PyModule_AddObject(m, "JobFactory", (PyObject *)&JobFactoryTypePy) < 0) {
+        Py_DECREF(&JobFactoryTypePy);
+        Py_DECREF(&JobTypePy);
+        Py_DECREF(&SolverFactoryTypePy);
         Py_DECREF(&SolverTypePy);
         Py_DECREF(&OdeFactoryTypePy);
         Py_DECREF(&OdeTypePy);

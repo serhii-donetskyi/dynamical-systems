@@ -52,22 +52,7 @@ static PyObject *OdeObjectPy_get_arguments(OdeObjectPy *self, PyObject *Py_UNUSE
         PyErr_SetString(PyExc_RuntimeError, "Invalid ode");
         return NULL;
     }
-    I arg_size = 0;
-    while (self->ode->args[arg_size].name) arg_size++;
-    
-    // Create type string and arrays
-    char types[arg_size + 1];
-    const char* names[arg_size];
-    const void* src[arg_size];
-    
-    for (I i = 0; i < arg_size; i++) {
-        types[i] = (char)self->ode->args[i].type;
-        names[i] = self->ode->args[i].name;
-        src[i] = &self->ode->args[i].i;
-    }
-    types[arg_size] = '\0';
-    
-    return py_get_list_from_args(types, names, src);
+    return py_get_list_from_args(self->ode->args, 1);
 }
 
 static PyObject *OdeObjectPy_get_x_size(OdeObjectPy *self, PyObject *Py_UNUSED(ignored)) {
@@ -152,8 +137,8 @@ static PyObject *OdeObjectPy_set_x(OdeObjectPy *self, PyObject *args, PyObject *
         PyErr_Format(
             PyExc_ValueError, 
             "Sequence length must be %d, but got %zd", 
-            seq_length,
-            self->ode->x_size
+            self->ode->x_size,
+            seq_length
         );
         return NULL;
     }
@@ -161,16 +146,12 @@ static PyObject *OdeObjectPy_set_x(OdeObjectPy *self, PyObject *args, PyObject *
     // Validate all elements are numbers and convert them to doubles
     for (Py_ssize_t i = 0; i < seq_length; i++) {
         PyObject *item = PySequence_GetItem(value, i);
-        if (!item) {
-            return NULL; // Exception already set
-        }
-        
-        // Convert to double
+        if (!item) return NULL; // Exception already set
+
         R double_value = PyFloat_AsDouble(item);
         Py_DECREF(item);
         
         if (PyErr_Occurred()) {
-            // PyFloat_AsDouble failed, but let's provide a clearer error
             PyErr_Format(
                 PyExc_ValueError, 
                 "Element at index %zd cannot be converted to float",
@@ -228,8 +209,8 @@ static PyObject *OdeObjectPy_set_p(OdeObjectPy *self, PyObject *args, PyObject *
         PyErr_Format(
             PyExc_ValueError, 
             "Sequence length must be %d, but got %zd", 
-            seq_length,
-            self->ode->p_size
+            self->ode->p_size,
+            seq_length
         );
         return NULL;
     }
@@ -291,6 +272,8 @@ static int OdeFactoryObjectPy_init(OdeFactoryObjectPy *self, PyObject *args, PyO
         dlclose(handle);
         return -1;
     }
+    output->malloc = PyMem_Malloc;
+    output->free = PyMem_Free;
     self->output = output;
     self->handle = handle;
     return 0;
@@ -307,80 +290,34 @@ static void OdeFactoryObjectPy_dealloc(OdeFactoryObjectPy *self) {
 
 // Factory method to create an OdeObjectPy
 static PyObject *OdeFactoryObjectPy_create(OdeFactoryObjectPy *self, PyObject *args, PyObject *kwargs) {
-    if (!self->output || !self->output->name || !self->output->x_size || 
-        !self->output->p_size || !self->output->fn || !self->output->args ||
-        !self->output->validate) {
+    if (!self->output || !self->output->name || !self->output->args) {
         PyErr_SetString(PyExc_RuntimeError, "Invalid factory state");
         return NULL;
     }
 
-    // Count number of arguments
-    I arg_size = 0;
-    while (self->output->args[arg_size].name) arg_size++;
-    argument_t *_args = PyMem_Malloc(sizeof(argument_t) * (arg_size + 1));
-    if (!_args) {
-        PyErr_SetString(PyExc_MemoryError, "Failed to allocate memory for arguments");
-        return NULL;
-    }
-    memcpy(_args, self->output->args, sizeof(argument_t) * (arg_size + 1));
+    argument_t *ode_args = py_copy_and_parse_args(args, kwargs, self->output->args);
+    if (!ode_args) return NULL;
 
-    char types[arg_size + 1]; // +1 for null terminator
-    const char* names[arg_size];
-    void* dest[arg_size];
-    for (I i = 0; i < arg_size; i++) {
-        types[i] = (char)_args[i].type;
-        names[i] = _args[i].name;
-        dest[i] = &_args[i].i;
-    }
-    types[arg_size] = '\0';
-    if (!py_parse_args(args, kwargs, types, names, dest)){
+    result_t result = self->output->create(ode_args);
+    PyMem_Free(ode_args); // ode_args are copied into the ode and no longer needed
+
+    if (result.type == FAILURE) {
+        PyErr_SetString(PyExc_RuntimeError, result.message);
         return NULL;
     }
-    
-    const char* error = self->output->validate(_args);
-    if (error) {
-        PyErr_SetString(PyExc_RuntimeError, error);
+    ode_t *ode = (ode_t *)result.data;
+    OdeObjectPy *ode_obj = (OdeObjectPy *)OdeTypePy.tp_alloc(&OdeTypePy, 0);
+    if (!ode_obj || !ode) {
+        if (ode) self->output->destroy(ode);
+        if (ode_obj) Py_DECREF(ode_obj);
+        PyErr_SetString(PyExc_RuntimeError, "Failed to allocate memory");
         return NULL;
     }
 
-    // Create ODE object
-    OdeObjectPy *py_ode = (OdeObjectPy *)OdeTypePy.tp_alloc(&OdeTypePy, 0);
-    py_ode->factory = self;
     Py_INCREF(self);
-    // Allocate and initialize ODE structure
-    ode_t *ode = PyMem_Malloc(sizeof(ode_t));
-    I x_size = self->output->x_size(_args);
-    I p_size = self->output->p_size(_args);
-    R *x = PyMem_Malloc(sizeof(R) * x_size);
-    R *p = PyMem_Malloc(sizeof(R) * p_size);
-
-    if (!py_ode || !ode || !x_size || !x || (p_size > 0 && !p_size) || !arg_size) {
-        if (x_size == 0){
-            PyErr_Format(PyExc_RuntimeError, "Failed to create ODE: x_size is 0");
-        } else {
-            PyErr_SetString(PyExc_RuntimeError, "Failed to create ODE");
-        }
-        if (py_ode) Py_DECREF(py_ode);
-        if (ode) PyMem_Free(ode);
-        if (x) PyMem_Free(x);
-        if (p) PyMem_Free(p);
-        if (_args) PyMem_Free(_args);
-        return NULL;
-    }
-
-    // Copy everything to ode
-    ode_t tmp = {
-        .x_size = x_size,
-        .p_size = p_size,
-        .fn = self->output->fn,
-        .x = x,
-        .p = p,
-        .args = _args,
-    };
-    memcpy(ode, &tmp, sizeof(ode_t));
-    py_ode->ode = ode;
-
-    return (PyObject *)py_ode;
+    ode_obj->factory = self;
+    ode_obj->ode = ode;
+    return (PyObject *)ode_obj;
 }
 
 // get_argument_types() method: returns a dictionary mapping argument names to their types
@@ -389,16 +326,7 @@ static PyObject *OdeFactoryObjectPy_get_argument_types(OdeFactoryObjectPy *self,
         PyErr_SetString(PyExc_RuntimeError, "Invalid output or arguments");
         return NULL;
     }
-    I arg_size = 0;
-    while (self->output->args[arg_size].name) arg_size++;
-    char types[arg_size + 1];
-    const char *names[arg_size];
-    for (I i = 0; i < arg_size; i++) {
-        types[i] = (char)self->output->args[i].type;
-        names[i] = self->output->args[i].name;
-    }
-    types[arg_size] = '\0';
-    return py_get_list_from_args(types, names, NULL);
+    return py_get_list_from_args(self->output->args, 0);
 }
 
 // get_name() method: returns the factory name

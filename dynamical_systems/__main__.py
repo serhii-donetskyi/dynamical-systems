@@ -19,9 +19,9 @@ Examples:
     --ode-variables-x 0.0 1.0 \
     --ode-parameters 0 1 -1 0 \
     --solver rk4 \
-    --solver-args h=0.01 \
+    --solver-args h_max=0.01 \
     --job portrait \
-    --job-args t_end=10.0 file_path=portrait.dat
+    --job-args t_end=10.0 file=portrait.dat
         """
     )
     
@@ -104,39 +104,20 @@ def main():
     """Main entry point for the dynamical systems package"""
     args = parse_args()
     
-    # Validate ODE exists
-    if args.ode not in components.get('ode', {}):
-        available_odes = list(components.get('ode', {}).keys())
-        print(f"Error: ODE '{args.ode}' not found.")
-        if available_odes:
-            print(f"Available ODEs: {', '.join(available_odes)}")
-        else:
-            print("No ODEs available in the system.")
-        raise ValueError(f"ODE '{args.ode}' not found.")
-    
-    # Validate solver exists
-    if args.solver not in components.get('solver', {}):
-        available_solvers = list(components.get('solver', {}).keys())
-        print(f"Error: Solver '{args.solver}' not found.")
-        if available_solvers:
-            print(f"Available solvers: {', '.join(available_solvers)}")
-        else:
-            print("No solvers available in the system.")
-        raise ValueError(f"Solver '{args.solver}' not found.")
-    
-    # Validate job exists
-    if args.job not in components.get('job', {}):
-        available_jobs = list(components.get('job', {}).keys())
-        print(f"Error: Job '{args.job}' not found.")
-        if available_jobs:
-            print(f"Available jobs: {', '.join(available_jobs)}")
-        else:
-            print("No jobs available in the system.")
-        raise ValueError(f"Job '{args.job}' not found.")
+    for component in components:
+        name = getattr(args, f'{component}')
+        if name not in components.get(component, {}):
+            available_components = list(components.get(component, {}))
+            print(f"Error: {component} '{name}' not found.")
+            if available_components:
+                print(f"Available {component}s: {', '.join(available_components)}")
+            else:
+                print(f"No {component}s available in the system.")
+            raise ValueError(f"{component} '{name}' not found.")
     
     ode_f = components['ode'][args.ode]
     solver_f = components['solver'][args.solver]
-    job = components['job'][args.job]
+    job_f = components['job'][args.job]
     
     ode_kwargs = {
         d['name']: d['value']
@@ -156,9 +137,7 @@ def main():
         d['name']: d['value']
         for d in args.job_args
     }
-    for arg in job.get_argument_types():
-        if arg['name'] in ['ode', 'solver']:
-            continue
+    for arg in job_f.get_argument_types():
         job_kwargs[arg['name']] = arg['type'](job_kwargs[arg['name']])
 
     ode = ode_f.create(**ode_kwargs) \
@@ -166,7 +145,8 @@ def main():
         .set_x(args.ode_variables_x) \
         .set_p(args.ode_parameters)
     solver = solver_f.create(**solver_kwargs)
-    job.run(ode, solver, **job_kwargs)
+    job = job_f.create(**job_kwargs)
+    job.run(ode, solver)
 
 if __name__ == "__main__":
     main()

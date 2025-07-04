@@ -6,25 +6,36 @@
 
 #define MAX_STEPS 1000000000L
 
-
-static const char* job(ode_t *restrict ode, solver_t *restrict solver, const argument_t *restrict args) {
-    char *error = 0;
+static result_t job(ode_t *restrict ode, solver_t *restrict solver, const argument_t *restrict args) {
+    result_t result = {.type = SUCCESS, .data = 0};
     I steps = 0;
 
     const R t_start = ode->t;
     I progress = 0;
     I progress_next = 0;
 
-    const R t_end = args[0].r;
-    const char *file_path = args[1].s;
+    const R h = args[0].r;
+    const R t_end = args[1].r;
+    const char *file_path = args[2].s;
+
+    if (h <= 0) {
+        result.type = FAILURE;
+        result.message = "h must be positive";
+        return result;
+    }
 
     if (t_end < ode->t) {
-        error = "t_end must be greater than ODE's t";
-        return error;
+        result.type = FAILURE;
+        result.message = "t_end must be greater than ODE's t";
+        return result;
     }
 
     FILE *file = fopen(file_path, "w");
-    if (!file) error = strerror(errno);
+    if (!file) {
+        result.type = FAILURE;
+        result.message = strerror(errno);
+        return result;
+    }
 
     fprintf(file, "t");
     for (I i = 0; i < ode->x_size; i++) {
@@ -36,7 +47,7 @@ static const char* job(ode_t *restrict ode, solver_t *restrict solver, const arg
     fflush(stdout);
 
     for (; steps < MAX_STEPS; ++steps) {
-        if (error) break;
+        if (result.type == FAILURE) break;
         if (ode->t > t_end) break;
 
         progress_next = (I)((ode->t - t_start) / (t_end - t_start) * 100);
@@ -48,33 +59,52 @@ static const char* job(ode_t *restrict ode, solver_t *restrict solver, const arg
         
         // Write current state to file
         if (fprintf(file, "%.6f", ode->t) < 0) {
-            error = "Failed to write to file";
+            result.type = FAILURE;
+            result.message = "Failed to write to file";
+            break;
         } else{
             for (I i = 0; i < ode->x_size; i++) {
                 if (fprintf(file, " %.6f", ode->x[i]) < 0){
-                    error = "Failed to write to file";
+                    result.type = FAILURE;
+                    result.message = "Failed to write to file";
                     break;
                 }
             }
-            if (fprintf(file, "\n") < 0) error = "Failed to write to file";
+            if (fprintf(file, "\n") < 0) {
+                result.type = FAILURE;
+                result.message = "Failed to write to file";
+                break;
+            }
         }
-        solver->step(solver, ode, &ode->t, ode->x, t_end);
+        result.message = solver->step(solver, ode, &ode->t, ode->x, ode->t + h);
+        if (result.message) {
+            result.type = FAILURE;
+            break;
+        }
     }
-    if (steps >= MAX_STEPS) error = "Job has failed to finish in 1,000,000,000 steps";
     fclose(file);
-    if (!error){
+    if (steps >= MAX_STEPS) {
+        result.type = FAILURE;
+        result.message = "Job has failed to finish in 1,000,000,000 steps";
+    }
+    if (result.type == SUCCESS){
         while (progress < 100){
             progress++;
             printf("%ld\n", progress);
             fflush(stdout);
         }
     }
-    return error;
+    return result;
 }
 
 job_output_t job_output = {
     .name = "portrait",
     .args = (argument_t[]){
+        {
+            .name = "h",
+            .type = REAL,
+            .r = 0.01,
+        },
         {
             .name = "t_end",
             .type = REAL,
