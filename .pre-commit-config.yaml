@@ -6,7 +6,7 @@ repos:
       - id: black
         language_version: python3
 
-  # Python linting  
+  # Python linting
   - repo: https://github.com/pycqa/flake8
     rev: 6.1.0
     hooks:
@@ -28,4 +28,4 @@ repos:
     rev: v16.0.6
     hooks:
       - id: clang-format
-        files: \.(c|h)$ 
+        files: \.(c|h)$
