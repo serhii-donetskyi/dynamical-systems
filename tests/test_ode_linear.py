@@ -1,20 +1,17 @@
 import pytest
 import random
-from dynamical_systems import components, Ode
+from dynamical_systems import Ode
 
-@pytest.fixture
-def factory():
-    return components['ode']['linear']
-
-def test_ode(factory):
-    ode = factory.create(n=2)
+def test_ode(ode_factory):
+    ode = ode_factory.create(n=2)
     t = random.random()
     x = [random.random() for _ in range(ode.get_x_size())]
     p = [random.random() for _ in range(ode.get_p_size())]
     ode.set_t(t)
     ode.set_x(x)
     ode.set_p(p)
-    assert factory.get_argument_types() == [{'name': 'n', 'type': int}]
+    assert ode_factory.get_argument_types() == [{'name': 'n', 'type': int}]
+    assert ode_factory.get_name() == 'linear'
     assert isinstance(ode, Ode)
     assert ode.get_x_size() == 2
     assert ode.get_p_size() == 4
@@ -23,10 +20,10 @@ def test_ode(factory):
     assert ode.get_p() == p
     assert ode.get_arguments() == [{'name': 'n', 'value': 2}]
 
-def test_errors(factory):
+def test_errors(ode_factory):
     with pytest.raises(Exception):
-        factory.create(n=-1)
-    ode = factory.create(n=2)
+        ode_factory.create(n=-1)
+    ode = ode_factory.create(n=2)
     with pytest.raises(Exception):
         ode.set_t('0')
     with pytest.raises(Exception):
