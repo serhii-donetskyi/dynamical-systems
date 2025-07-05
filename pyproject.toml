@@ -21,6 +21,7 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Programming Language :: C",
     "Topic :: Scientific/Engineering :: Mathematics",
     "Topic :: Scientific/Engineering :: Physics",
@@ -33,6 +34,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0.0",
+    "build",
     "pre-commit",
 ]
 
@@ -52,4 +54,4 @@ where = ["."]
 include = ["dynamical_systems*"]
 
 [tool.setuptools.package-data]
-dynamical_systems = ["*.so", "**/*.so"] 
+dynamical_systems = ["*.so", "**/*.so"]
