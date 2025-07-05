@@ -5,6 +5,7 @@ from setuptools import setup, Extension
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 
+
 def walk(dirpath):
     for dirpath, dirnames, filenames in os.walk(dirpath):
         for filename in filenames:
