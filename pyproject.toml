@@ -16,11 +16,6 @@ classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: MIT License",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: C",
     "Topic :: Scientific/Engineering :: Mathematics",
@@ -49,6 +44,8 @@ Issues = "https://github.com/serhii-donetskyi/dynamical-systems/issues"
 
 [tool.setuptools_scm]
 write_to = "dynamical_systems/_version.py"
+version_scheme = "release-branch-semver"
+local_scheme = "no-local-version"
 
 [tool.setuptools.packages.find]
 where = ["."]
