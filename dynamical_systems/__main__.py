@@ -21,7 +21,7 @@ Examples:
     --solver rk4 \
     --solver-args h_max=0.01 \
     --job portrait \
-    --job-args t_end=10.0 file=portrait.dat
+    --job-args t_step=0.1 t_end=10.0 file=portrait.dat
         """
     )
     
