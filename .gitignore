@@ -4,7 +4,8 @@
 
 # build
 *.so
-build*
+build/*
+dist/*
 
 # python
 .venv*
