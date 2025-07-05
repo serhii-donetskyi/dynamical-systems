@@ -69,13 +69,13 @@ class DynamicalSystemsUI {
                 message: document.getElementById('progress-section-message')
             }
         }
-        
+
         this.jobId = null;
         this.eventSource = null;
-        
+
         this.init();
     }
-    
+
     async init() {
         try {
             // Load all components in parallel
@@ -91,16 +91,16 @@ class DynamicalSystemsUI {
         } catch (error) {
             this.createPopUp(`Failed to load components: ${error}`, false);
         }
-        
+
         // Dropdown change listeners
         this.components.ode.dropdown.addEventListener('change', (e) => {
             this.generateArgumentFields('ode', e.target.value);
         });
-        
+
         this.components.solver.dropdown.addEventListener('change', (e) => {
             this.generateArgumentFields('solver', e.target.value);
         });
-        
+
         this.components.job.dropdown.addEventListener('change', (e) => {
             this.generateArgumentFields('job', e.target.value);
         });
@@ -125,7 +125,7 @@ class DynamicalSystemsUI {
             this.loadConfig();
         });
     }
-    
+
     async fetchAPI(url, options = {}) {
         const config = {
             method: 'GET',
@@ -197,17 +197,17 @@ class DynamicalSystemsUI {
 
         const argValues = this.componentConfigs[componentType][componentName].args;
         const argValidations = this.fieldValidations[componentType].args;
-        
+
         try {
             const argumentTypes = await this.fetchAPI(`/api/get-${componentType}-arguments/${componentName}`);
             argumentTypes.forEach(({name: argName, type: argType}) => {
                 const fieldDiv = document.createElement('div');
                 fieldDiv.className = 'argument-field';
-                
+
                 const label = document.createElement('label');
                 label.textContent = argName;
                 label.setAttribute('for', `${id}-${argName}`);
-                
+
                 const input = document.createElement('input');
                 input.type = 'text';
                 input.className = 'argument-input';
@@ -237,11 +237,11 @@ class DynamicalSystemsUI {
 
                 input.value = argValues[argName];
                 input.dispatchEvent(new Event('input', { bubbles: true })); // Trigger input event to update UI
-                
+
                 const typeInfo = document.createElement('div');
                 typeInfo.className = 'argument-type';
                 typeInfo.textContent = `Type: ${argType}`;
-                
+
                 fieldDiv.appendChild(label);
                 fieldDiv.appendChild(input);
                 fieldDiv.appendChild(typeInfo);
@@ -267,20 +267,20 @@ class DynamicalSystemsUI {
         section.style.display = 'block';
         variables.innerHTML = '';
         parameters.innerHTML = '';
-        
+
         try {
             const stateData = await this.fetchAPI(`/api/get-ode-state/${this.selectedComponents.ode}`, {
                 method: 'POST',
                 body: this.componentConfigs.ode[this.selectedComponents.ode].args
             });
-            
+
             // Generate variable fields
             if (stateData.variables) {
                 stateData.variables.forEach(({name: varName}) => {
                     this.createStateField('variables', varName);
                 });
             }
-            
+
             // Generate parameter fields
             if (stateData.parameters) {
                 stateData.parameters.forEach(({name: paramName}) => {
@@ -294,24 +294,24 @@ class DynamicalSystemsUI {
 
     createStateField(fieldType, fieldName) {
         const container = this.components.ode.state[fieldType];
-        
+
         const fieldDiv = document.createElement('div');
         fieldDiv.className = 'state-field';
-        
+
         const label = document.createElement('label');
         label.textContent = fieldName;
         label.setAttribute('for', `${container.id}-${fieldName}`);
-        
+
         const input = document.createElement('input');
         input.type = 'text';
         input.className = 'state-input';
         input.id = `${container.id}-${fieldName}`;
         input.name = `${container.id}-${fieldName}`;
-        
+
         // Initialize state config for this field
         const stateValues = this.componentConfigs.ode[this.selectedComponents.ode][fieldType];
         const stateValidations = this.fieldValidations.ode[fieldType];
-        
+
         // Add input event listener
         input.addEventListener('input', (e) => {
             stateValues[fieldName] = e.target.value;
@@ -323,14 +323,14 @@ class DynamicalSystemsUI {
             }
             this.checkIfRunReady();
         });
-        
+
         input.value = stateValues[fieldName] || '0';
         input.dispatchEvent(new Event('input', { bubbles: true })); // Trigger input event to update UI
-        
+
         const typeInfo = document.createElement('div');
         typeInfo.className = 'state-type';
         typeInfo.textContent = 'Type: float';
-        
+
         fieldDiv.appendChild(label);
         fieldDiv.appendChild(input);
         fieldDiv.appendChild(typeInfo);
@@ -370,15 +370,15 @@ class DynamicalSystemsUI {
             if (response.status !== 'started' || !response.job_id) {
                 throw new Error('Failed to start mock job');
             }
-            
+
             this.jobId = response.job_id;
             // Close any existing event source
             if (this.eventSource) {
                 this.eventSource.close();
             }
-    
+
             this.eventSource = new EventSource(`/api/job-event-stream/${this.jobId}`);
-            
+
             this.eventSource.onmessage = (event) => {
                 try {
                     const eventData = JSON.parse(event.data);
@@ -387,7 +387,7 @@ class DynamicalSystemsUI {
                     this.components.progress.fill.style.width = `${percentage}%`;
                     this.components.progress.percentage.textContent = `${percentage}%`;
                     this.components.progress.message.textContent = eventData.message;
-                    
+
                     if (eventData.status === 'completed') {
                         this.createPopUp(eventData.message, true);
                         this.resetJobState();
@@ -400,7 +400,7 @@ class DynamicalSystemsUI {
                     this.resetJobState();
                 }
             };
-            
+
             this.eventSource.onerror = (event) => {
                 this.createPopUp('Connection to server lost', false);
                 this.resetJobState();
@@ -420,7 +420,7 @@ class DynamicalSystemsUI {
         }
         this.components.progress.message.textContent = 'Canceled';
 
-        
+
         this.fetchAPI(`/api/cancel-job/${this.jobId}`, {
             method: 'POST'
         })
@@ -442,14 +442,14 @@ class DynamicalSystemsUI {
         this.jobId = null;
         this.setLoading(false);
     }
-    
+
     isValidField(argValue, argType) {
         const value = String(argValue).trim();
-        
+
         if (value === '') {
             return false;
         }
-        
+
         switch (argType) {
             case 'int':
                 // Check if entire string is a valid integer
@@ -484,7 +484,7 @@ class DynamicalSystemsUI {
         } else {
             console.error(message);
         }
-        
+
         // Remove existing popups FIRST
         const existingPopUps = document.querySelectorAll('#pop-up');
         existingPopUps.forEach(popup => {
@@ -511,7 +511,7 @@ class DynamicalSystemsUI {
             }
         }, 5000);
     }
-    
+
     setLoading(isLoading) {
         const interactiveElements = [
             this.components.action.run,
@@ -553,13 +553,13 @@ class DynamicalSystemsUI {
 
             // Convert to JSON string with pretty formatting
             const configJSON = JSON.stringify(config, null, 2);
-            
+
             // Create filename with timestamp
             const filename = `dynamical-systems-config.json`;
 
             // Download the file
             this.downloadFile(filename, configJSON);
-            
+
             this.createPopUp('Configuration saved successfully!', true);
         } catch (error) {
             console.error('Save config error:', error);
@@ -590,7 +590,7 @@ class DynamicalSystemsUI {
                 }
             };
             reader.readAsText(file);
-            
+
             // Clean up
             document.body.removeChild(fileInput);
         });
@@ -627,7 +627,7 @@ class DynamicalSystemsUI {
                 if (selectedValue) {
                     const dropdown = this.components[componentType].dropdown;
                     dropdown.value = selectedValue;
-                    
+
                     // Generate argument fields and wait for completion
                     await this.generateArgumentFields(componentType, selectedValue);
                 }
@@ -640,7 +640,7 @@ class DynamicalSystemsUI {
             if (this.selectedComponents.ode) {
                 await this.generateStateFields();
             }
-            
+
             this.checkIfRunReady();
 
         } catch (error) {
@@ -660,7 +660,7 @@ class DynamicalSystemsUI {
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
-            
+
             return true;
         } catch (error) {
             console.error('Download file error:', error);
