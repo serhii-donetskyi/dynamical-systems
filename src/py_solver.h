@@ -1,21 +1,19 @@
 #ifndef PY_SOLVER_H
 #define PY_SOLVER_H
 
-#include <Python.h>
-#include "structmember.h"
 #include "core.h"
+#include "structmember.h"
+#include <Python.h>
 
 // Solver
 typedef struct {
-    PyObject_HEAD
-    solver_output_t *output;
-    void* handle;
+  PyObject_HEAD solver_output_t *output;
+  void *handle;
 } SolverFactoryObjectPy;
 
 typedef struct {
-    PyObject_HEAD
-    SolverFactoryObjectPy *factory;
-    solver_t *solver;
+  PyObject_HEAD SolverFactoryObjectPy *factory;
+  solver_t *solver;
 } SolverObjectPy;
 
 extern PyTypeObject SolverFactoryTypePy;
