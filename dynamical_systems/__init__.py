@@ -5,6 +5,7 @@ A high-level Python interface for numerical analysis of dynamical systems.
 """
 
 import os
+import sys
 
 from ._dynamical_systems import OdeFactory, SolverFactory, JobFactory, Job, Ode, Solver
 
@@ -36,7 +37,7 @@ def generate_module_cmd(ode, solver, job):
     solver_args = [f"{arg['name']}={arg['value']}" for arg in solver.get_arguments()]
     job_args = [f"{arg['name']}={arg['value']}" for arg in job.get_arguments()]
     return [
-        "python",
+        sys.executable,
         "-m",
         "dynamical_systems",
         "run",
