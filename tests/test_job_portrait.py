@@ -36,16 +36,12 @@ def test_errors(job_factory):
 def test_module_cmd(job_factory, ode, solver):
     file = "test_progress.txt"
     job = job_factory.create(t_step=0.5, t_end=1.0, file=file)
-    cmd = generate_module_cmd(ode, solver, job)
-
-    # Run subprocess with current environment to ensure package is found
     process = subprocess.run(
         generate_module_cmd(ode, solver, job), text=True, capture_output=True
     )
 
     # Better error reporting
     if process.returncode != 0:
-        print(f"Command failed: {' '.join(cmd)}")
         print(f"Return code: {process.returncode}")
         print(f"stdout: {process.stdout}")
         print(f"stderr: {process.stderr}")
