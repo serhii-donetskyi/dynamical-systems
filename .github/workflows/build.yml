@@ -168,4 +168,4 @@ jobs:
       uses: pypa/gh-action-pypi-publish@v1.8.10
       with:
         password: ${{ secrets.PYPI_API_TOKEN }}
-        packages_dir: dist/**/ 
+        packages_dir: dist/**/
