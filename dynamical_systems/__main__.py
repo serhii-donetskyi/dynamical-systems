@@ -1,6 +1,6 @@
 import argparse
 
-from dynamical_systems import components
+from dynamical_systems import components, __version__
 from dynamical_systems.ui import main as ui_main
 
 
@@ -9,15 +9,15 @@ def parse_component_args(arg: str):
         return {"name": k, "value": v}
 
 
-def add_core_parser(subparsers):
+def add_run_parser(subparsers):
     """Parse command line arguments for dynamical systems"""
     parser = subparsers.add_parser(
-        "core",
-        help="Run the core dynamical systems",
+        "run",
+        help="Run the dynamical systems",
         description = "Dynamical Systems Package - Numerical analysis of dynamical systems",
         formatter_class = argparse.RawDescriptionHelpFormatter,
         epilog = "\nExamples:"
-            "\n  python -m dynamical_systems core \\"
+            "\n  python -m dynamical_systems run \\"
             "\n    --ode linear \\"
             "\n    --ode-args n=2 \\"
             "\n    --ode-variables-t 0.0 \\"
@@ -97,7 +97,7 @@ def add_core_parser(subparsers):
     )
 
 
-def run_core(args):
+def execute_run(args):
     for component in components:
         name = getattr(args, f"{component}")
         if name not in components.get(component, {}):
@@ -140,21 +140,21 @@ def add_ui_parser(subparsers):
     parser.add_argument("--port", type=int, default=5001, help="Port to run the server on")
     parser.add_argument("--debug", default=False, action="store_true", help="Run in debug mode")
 
-def run_ui(args):
+def execute_ui(args):
     ui_main(args.port, args.debug)
 
 
 def main():
     """Main entry point for the dynamical systems package"""
-    parser = argparse.ArgumentParser(description="Dynamical Systems Package - Numerical analysis of dynamical systems")
+    parser = argparse.ArgumentParser(description=f"Dynamical Systems Package - Numerical analysis of dynamical systems (v{__version__})")
     subparsers = parser.add_subparsers(dest="command")
-    add_core_parser(subparsers)
+    add_run_parser(subparsers)
     add_ui_parser(subparsers)
     args = parser.parse_args()
-    if args.command == "core":
-        run_core(args)
+    if args.command == "run":
+        execute_run(args)
     elif args.command == "ui":
-        run_ui(args)
+        execute_ui(args)
     else:
         parser.print_help()
 

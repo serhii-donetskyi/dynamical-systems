@@ -39,6 +39,7 @@ def generate_module_cmd(ode, solver, job):
         "python",
         "-m",
         "dynamical_systems",
+        "run",
         "--ode",
         ode.get_factory().get_name(),
         "--ode-args",
