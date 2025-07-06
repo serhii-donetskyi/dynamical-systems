@@ -10,12 +10,11 @@ authors = [
     {name = "Serhii Donetskyi", email = "your.email@example.com"},
 ]
 readme = "README.md"
-license = {text = "MIT"}
+license = "MIT"
 requires-python = ">=3.9"
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: C",
     "Topic :: Scientific/Engineering :: Mathematics",
