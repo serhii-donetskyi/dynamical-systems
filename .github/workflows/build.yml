@@ -110,10 +110,12 @@ jobs:
         python -m pip install --upgrade pip
         pip install pyinstaller
         pip install -e .
+      shell: bash
 
     - name: Build executable
       run: |
         pyinstaller dynamical-systems.spec --clean
+      shell: bash
 
     - name: Set executable name
       shell: bash
@@ -139,6 +141,7 @@ jobs:
       run: |
         cd dist
         zip -r ../${{ env.ARCHIVE_NAME }} ${{ env.EXECUTABLE_NAME }}
+      shell: bash
 
     - name: Upload executable artifact
       uses: actions/upload-artifact@v3
