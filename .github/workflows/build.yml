@@ -45,19 +45,25 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install build pytest
+        pip install build pytest setuptools wheel
 
     - name: Build package
       run: |
-        python -m build
+        python -m build --verbose
 
     - name: Install package
       run: |
         pip install dist/*.whl
 
+    - name: Verify installation
+      run: |
+        python -c "import dynamical_systems; print('Package imported successfully')"
+        python -c "from dynamical_systems import _dynamical_systems; print('C extension imported successfully')"
+        python -c "from dynamical_systems import components; print('Components:', components)"
+
     - name: Run tests
       run: |
-        pytest
+        pytest -v
 
   build-wheels:
     needs: test
