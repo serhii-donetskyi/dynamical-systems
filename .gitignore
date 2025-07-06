@@ -12,6 +12,7 @@ dist/*
 __pycache__*
 *.egg-info*
 .python-version
+_version.py
 
 # environment
 .env
