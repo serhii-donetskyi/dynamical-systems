@@ -14,19 +14,19 @@ def add_run_parser(subparsers):
     parser = subparsers.add_parser(
         "run",
         help="Run the dynamical systems",
-        description = "Dynamical Systems Package - Numerical analysis of dynamical systems",
-        formatter_class = argparse.RawDescriptionHelpFormatter,
-        epilog = "\nExamples:"
-            "\n  python -m dynamical_systems run \\"
-            "\n    --ode linear \\"
-            "\n    --ode-args n=2 \\"
-            "\n    --ode-variables-t 0.0 \\"
-            "\n    --ode-variables-x 0.0 1.0 \\"
-            "\n    --ode-parameters 0 1 -1 0 \\"
-            "\n    --solver rk4 \\"
-            "\n    --solver-args h_max=0.01 \\"
-            "\n    --job portrait \\"
-            "\n    --job-args t_step=0.1 t_end=10.0 file=portrait.dat"
+        description="Dynamical Systems Package - Numerical analysis of dynamical systems",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="\nExamples:"
+        "\n  python -m dynamical_systems run \\"
+        "\n    --ode linear \\"
+        "\n    --ode-args n=2 \\"
+        "\n    --ode-variables-t 0.0 \\"
+        "\n    --ode-variables-x 0.0 1.0 \\"
+        "\n    --ode-parameters 0 1 -1 0 \\"
+        "\n    --solver rk4 \\"
+        "\n    --solver-args h_max=0.01 \\"
+        "\n    --job portrait \\"
+        "\n    --job-args t_step=0.1 t_end=10.0 file=portrait.dat",
     )
 
     # ODE specification
@@ -135,10 +135,16 @@ def execute_run(args):
     job = job_f.create(**job_kwargs)
     job.run(ode, solver)
 
+
 def add_ui_parser(subparsers):
     parser = subparsers.add_parser("ui", help="Run the web UI")
-    parser.add_argument("--port", type=int, default=5001, help="Port to run the server on")
-    parser.add_argument("--debug", default=False, action="store_true", help="Run in debug mode")
+    parser.add_argument(
+        "--port", type=int, default=5001, help="Port to run the server on"
+    )
+    parser.add_argument(
+        "--debug", default=False, action="store_true", help="Run in debug mode"
+    )
+
 
 def execute_ui(args):
     ui_main(args.port, args.debug)
@@ -146,7 +152,9 @@ def execute_ui(args):
 
 def main():
     """Main entry point for the dynamical systems package"""
-    parser = argparse.ArgumentParser(description=f"Dynamical Systems Package - Numerical analysis of dynamical systems (v{__version__})")
+    parser = argparse.ArgumentParser(
+        description=f"Dynamical Systems Package - Numerical analysis of dynamical systems (v{__version__})"
+    )
     subparsers = parser.add_subparsers(dest="command")
     add_run_parser(subparsers)
     add_ui_parser(subparsers)
@@ -157,6 +165,7 @@ def main():
         execute_ui(args)
     else:
         parser.print_help()
+
 
 if __name__ == "__main__":
     main()

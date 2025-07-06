@@ -300,6 +300,7 @@ def job_event_stream(job_id):
         },
     )
 
+
 def main(port=5001, debug=False):
     print("Starting Dynamical Systems Web UI...")
     print("Scanning for components...")
@@ -310,4 +311,3 @@ def main(port=5001, debug=False):
     print(f"\nAccess the application at: http://localhost:{port}")
 
     app.run(debug=debug, host="0.0.0.0", port=port)
-
