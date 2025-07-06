@@ -19,6 +19,9 @@ import sys
 import traceback
 import subprocess
 import uuid
+import webbrowser
+import threading
+import time
 
 from dynamical_systems import components, generate_module_cmd
 
@@ -308,6 +311,17 @@ def main(port=5001, debug=False):
     print(f"  ODEs: {list(components['ode'])}")
     print(f"  Solvers: {list(components['solver'])}")
     print(f"  Jobs: {list(components['job'])}")
-    print(f"\nAccess the application at: http://localhost:{port}")
+    print(f"\nServer starting... Opening browser automatically!")
+    print(f"Access the application at: http://localhost:{port}")
+    
+    # Function to open browser after a short delay
+    def open_browser():
+        time.sleep(1.5)  # Wait for server to start
+        webbrowser.open(f"http://localhost:{port}")
+    
+    # Start browser opening in a separate thread
+    browser_thread = threading.Thread(target=open_browser)
+    browser_thread.daemon = True
+    browser_thread.start()
 
     app.run(debug=debug, host="0.0.0.0", port=port)

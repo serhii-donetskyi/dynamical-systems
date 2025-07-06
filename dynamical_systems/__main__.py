@@ -1,5 +1,5 @@
 import argparse
-
+import sys
 from dynamical_systems import components, __version__
 from dynamical_systems.ui import main as ui_main
 
@@ -158,6 +158,16 @@ def main():
     subparsers = parser.add_subparsers(dest="command")
     add_run_parser(subparsers)
     add_ui_parser(subparsers)
+    
+    # If no arguments provided, default to UI mode (perfect for double-clicking)
+    if len(sys.argv) == 1:
+        # No arguments provided - launch UI with default settings
+        class DefaultUIArgs:
+            port = 5001
+            debug = False
+        execute_ui(DefaultUIArgs())
+        return
+    
     args = parser.parse_args()
     if args.command == "run":
         execute_run(args)
