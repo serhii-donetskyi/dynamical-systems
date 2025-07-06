@@ -1,5 +1,7 @@
 import argparse
-from . import components
+
+from dynamical_systems import components
+from dynamical_systems.ui import main as ui_main
 
 
 def parse_component_args(arg: str):
@@ -7,24 +9,24 @@ def parse_component_args(arg: str):
         return {"name": k, "value": v}
 
 
-def parse_args():
+def add_core_parser(subparsers):
     """Parse command line arguments for dynamical systems"""
-    parser = argparse.ArgumentParser(
-        description="Dynamical Systems Package - Numerical analysis of dynamical systems",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  python -m dynamical_systems \
-    --ode linear \
-    --ode-args n=2 \
-    --ode-variables-t 0.0 \
-    --ode-variables-x 0.0 1.0 \
-    --ode-parameters 0 1 -1 0 \
-    --solver rk4 \
-    --solver-args h_max=0.01 \
-    --job portrait \
-    --job-args t_step=0.1 t_end=10.0 file=portrait.dat
-        """,
+    parser = subparsers.add_parser(
+        "core",
+        help="Run the core dynamical systems",
+        description = "Dynamical Systems Package - Numerical analysis of dynamical systems",
+        formatter_class = argparse.RawDescriptionHelpFormatter,
+        epilog = "\nExamples:"
+            "\n  python -m dynamical_systems core \\"
+            "\n    --ode linear \\"
+            "\n    --ode-args n=2 \\"
+            "\n    --ode-variables-t 0.0 \\"
+            "\n    --ode-variables-x 0.0 1.0 \\"
+            "\n    --ode-parameters 0 1 -1 0 \\"
+            "\n    --solver rk4 \\"
+            "\n    --solver-args h_max=0.01 \\"
+            "\n    --job portrait \\"
+            "\n    --job-args t_step=0.1 t_end=10.0 file=portrait.dat"
     )
 
     # ODE specification
@@ -94,13 +96,8 @@ Examples:
         help="Job arguments as key=value pairs (e.g., name1=value1 name2=value2)",
     )
 
-    return parser.parse_args()
 
-
-def main():
-    """Main entry point for the dynamical systems package"""
-    args = parse_args()
-
+def run_core(args):
     for component in components:
         name = getattr(args, f"{component}")
         if name not in components.get(component, {}):
@@ -138,6 +135,28 @@ def main():
     job = job_f.create(**job_kwargs)
     job.run(ode, solver)
 
+def add_ui_parser(subparsers):
+    parser = subparsers.add_parser("ui", help="Run the web UI")
+    parser.add_argument("--port", type=int, default=5001, help="Port to run the server on")
+    parser.add_argument("--debug", default=False, action="store_true", help="Run in debug mode")
+
+def run_ui(args):
+    ui_main(args.port, args.debug)
+
+
+def main():
+    """Main entry point for the dynamical systems package"""
+    parser = argparse.ArgumentParser(description="Dynamical Systems Package - Numerical analysis of dynamical systems")
+    subparsers = parser.add_subparsers(dest="command")
+    add_core_parser(subparsers)
+    add_ui_parser(subparsers)
+    args = parser.parse_args()
+    if args.command == "core":
+        run_core(args)
+    elif args.command == "ui":
+        run_ui(args)
+    else:
+        parser.print_help()
 
 if __name__ == "__main__":
     main()

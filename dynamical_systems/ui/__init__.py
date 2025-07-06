@@ -300,14 +300,14 @@ def job_event_stream(job_id):
         },
     )
 
-
-if __name__ == "__main__":
+def main(port=5001, debug=False):
     print("Starting Dynamical Systems Web UI...")
     print("Scanning for components...")
     print("Available components:")
     print(f"  ODEs: {list(components['ode'])}")
     print(f"  Solvers: {list(components['solver'])}")
     print(f"  Jobs: {list(components['job'])}")
-    print("\nAccess the application at: http://localhost:5001")
+    print(f"\nAccess the application at: http://localhost:{port}")
 
-    app.run(debug=True, host="0.0.0.0", port=5001)
+    app.run(debug=debug, host="0.0.0.0", port=port)
+
