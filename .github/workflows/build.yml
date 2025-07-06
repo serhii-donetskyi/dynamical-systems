@@ -53,6 +53,7 @@ jobs:
 
     - name: Install package
       run: |
+        find . -type f | sed 's|^\./||' | sort
         pip install dist/*.whl
 
     - name: Verify installation
