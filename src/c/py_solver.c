@@ -1,7 +1,7 @@
 #include "py_solver.h"
+#include "dynlib.h"
 #include "py_common.h"
 #include "py_ode.h"
-#include "dynlib.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -86,7 +86,8 @@ static int SolverFactoryObjectPy_init(SolverFactoryObjectPy *self,
     PyErr_SetString(PyExc_RuntimeError, dynlib_error());
     return -1;
   }
-  solver_output_t *output = (solver_output_t *)dynlib_sym(handle, "solver_output");
+  solver_output_t *output =
+      (solver_output_t *)dynlib_sym(handle, "solver_output");
   if (!output) {
     PyErr_SetString(PyExc_RuntimeError, dynlib_error());
     dynlib_close(handle);

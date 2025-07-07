@@ -2,8 +2,8 @@
 #define PY_SOLVER_H
 
 #include "core.h"
-#include "structmember.h"
 #include "dynlib.h"
+#include "structmember.h"
 #include <Python.h>
 
 // Solver

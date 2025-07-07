@@ -2,8 +2,8 @@
 #define PY_ODE_H
 
 #include "core.h"
-#include "structmember.h"
 #include "dynlib.h"
+#include "structmember.h"
 #include <Python.h>
 
 // Python wrapper for ode_output_t
