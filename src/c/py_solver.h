@@ -3,12 +3,13 @@
 
 #include "core.h"
 #include "structmember.h"
+#include "dynlib.h"
 #include <Python.h>
 
 // Solver
 typedef struct {
   PyObject_HEAD solver_output_t *output;
-  void *handle;
+  dynlib_handle_t handle;
 } SolverFactoryObjectPy;
 
 typedef struct {

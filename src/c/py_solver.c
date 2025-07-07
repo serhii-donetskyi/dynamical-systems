@@ -1,7 +1,7 @@
 #include "py_solver.h"
 #include "py_common.h"
 #include "py_ode.h"
-#include <dlfcn.h> // For RTLD_LAZY
+#include "dynlib.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -81,15 +81,15 @@ static int SolverFactoryObjectPy_init(SolverFactoryObjectPy *self,
   if (!PyArg_ParseTupleAndKeywords(args, kwds, "s", kwlist, &libpath)) {
     return -1;
   }
-  void *handle = dlopen(libpath, RTLD_LAZY);
+  dynlib_handle_t handle = dynlib_open(libpath);
   if (!handle) {
-    PyErr_SetString(PyExc_RuntimeError, dlerror());
+    PyErr_SetString(PyExc_RuntimeError, dynlib_error());
     return -1;
   }
-  solver_output_t *output = (solver_output_t *)dlsym(handle, "solver_output");
+  solver_output_t *output = (solver_output_t *)dynlib_sym(handle, "solver_output");
   if (!output) {
-    PyErr_SetString(PyExc_RuntimeError, dlerror());
-    dlclose(handle);
+    PyErr_SetString(PyExc_RuntimeError, dynlib_error());
+    dynlib_close(handle);
     return -1;
   }
   output->malloc = PyMem_Malloc;
@@ -101,7 +101,7 @@ static int SolverFactoryObjectPy_init(SolverFactoryObjectPy *self,
 
 static void SolverFactoryObjectPy_dealloc(SolverFactoryObjectPy *self) {
   if (self->handle) {
-    dlclose(self->handle);
+    dynlib_close(self->handle);
     self->handle = NULL;
   }
   self->output = NULL;

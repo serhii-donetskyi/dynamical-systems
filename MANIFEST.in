@@ -1,0 +1,9 @@
+
+recursive-include src/c *.h
+recursive-include src/c *.c
+
+recursive-include src/python *.py
+recursive-include src/python *.so
+
+global-exclude *.pyc
+global-exclude __pycache__ 

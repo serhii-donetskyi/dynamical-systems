@@ -27,7 +27,7 @@ for component in ["ode", "solver", "job"]:
     component_dir = os.path.join(current_dir, component)
     for fname in os.listdir(component_dir):
         if fname.endswith(".so"):
-            name = fname.replace(".so", "")
+            name, _ = fname.split(".", 1)
             component_path = os.path.join(component_dir, fname)
             components[component][name] = factories[component](component_path)
 

@@ -42,12 +42,12 @@ Repository = "https://github.com/serhii-donetskyi/dynamical-systems"
 Issues = "https://github.com/serhii-donetskyi/dynamical-systems/issues"
 
 [tool.setuptools_scm]
-write_to = "dynamical_systems/_version.py"
+write_to = "src/python/_version.py"
 local_scheme = "no-local-version"
 
 [tool.setuptools.packages.find]
-where = ["."]
-include = ["dynamical_systems*"]
+where = ["src"]
+include = ["python*"]
 
 [tool.setuptools.package-data]
 dynamical_systems = ["*.so", "**/*.so"]
