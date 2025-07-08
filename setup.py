@@ -90,7 +90,7 @@ class BuildExtWithSharedLibs(_build_ext):
     def build_shared_lib_windows(self, source, output, include_dirs):
         """Build shared library on Windows using the build_ext compiler"""
         import tempfile
-        
+
         # Create temp directory for object files
         with tempfile.TemporaryDirectory() as temp_dir:
             print(f"Compiling {source}")
@@ -100,7 +100,7 @@ class BuildExtWithSharedLibs(_build_ext):
                 include_dirs=include_dirs,
                 extra_preargs=compile_args,
             )
-            
+
             print(f"Linking to {output}")
             self.compiler.link_shared_object(
                 objects=objects,
@@ -116,8 +116,8 @@ class BuildExtWithSharedLibs(_build_ext):
     def build_shared_lib_unix(self, source, output, include_dirs):
         """Build shared library on Unix-like systems using the build_ext compiler"""
         import tempfile
-        
-        # Create temp directory for object files  
+
+        # Create temp directory for object files
         with tempfile.TemporaryDirectory() as temp_dir:
             print(f"Compiling {source}")
             objects = self.compiler.compile(
@@ -126,7 +126,7 @@ class BuildExtWithSharedLibs(_build_ext):
                 include_dirs=include_dirs,
                 extra_preargs=compile_args,
             )
-            
+
             print(f"Linking to {output}")
             self.compiler.link_shared_object(
                 objects=objects,

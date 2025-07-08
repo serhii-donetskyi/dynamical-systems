@@ -6,6 +6,19 @@
 
 #define MAX_STEPS 1000000000L
 
+// Cross-platform safe error string function
+static const char *safe_strerror(int errnum) {
+#ifdef _MSC_VER
+    static char buffer[256];
+    if (strerror_s(buffer, sizeof(buffer), errnum) == 0) {
+        return buffer;
+    }
+    return "Unknown error";
+#else
+    return strerror(errnum);
+#endif
+}
+
 static const char *solout(FILE *file, const ode_t *ode) {
   const char *error = "Failed to write to file";
   if (fprintf(file, "%.6f", ode->t) < 0)
@@ -46,7 +59,7 @@ static result_t job(ode_t *restrict ode, solver_t *restrict solver,
   FILE *file = fopen(file_path, "w");
   if (!file) {
     result.type = FAILURE;
-    result.message = strerror(errno);
+    result.message = safe_strerror(errno);
     return result;
   }
 
