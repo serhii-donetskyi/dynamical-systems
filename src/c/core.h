@@ -1,23 +1,23 @@
 #ifndef CORE_H
 #define CORE_H
 
+#include <inttypes.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <inttypes.h>
 
 // Macro to select integer type matching pointer size
 #if UINTPTR_MAX == 0xFFFFFFFF
-    // 32-bit system
-    typedef int32_t I;
-    typedef float R;
-    #define PRI_I PRId32
+// 32-bit system
+typedef int32_t I;
+typedef float R;
+#define PRI_I PRId32
 #elif UINTPTR_MAX == 0xFFFFFFFFFFFFFFFF
-    // 64-bit system  
-    typedef int64_t I;
-    typedef double R;
-    #define PRI_I PRId64
+// 64-bit system
+typedef int64_t I;
+typedef double R;
+#define PRI_I PRId64
 #else
-    #error "Unsupported system architecture"
+#error "Unsupported system architecture"
 #endif
 
 // Verify our type selection worked
