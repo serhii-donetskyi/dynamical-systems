@@ -30,7 +30,7 @@ for root, dirs, files in os.walk(module_dir):
         full_path = os.path.join(root, file)
         rel_path = os.path.relpath(full_path, module_dir)
         dest_path = os.path.join('dynamical_systems', rel_path)
-        
+
         if file.endswith(('.so', '.pyd', '.dll')):
             # Binary files (C extensions)
             binaries.append((full_path, os.path.dirname(dest_path)))
