@@ -1,7 +1,6 @@
 #ifndef CORE_H
 #define CORE_H
 
-#include <inttypes.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -10,12 +9,12 @@
 // 32-bit system
 typedef int I;
 typedef float R;
-#define PRI_I PRId32
+#define PRI_I "d"
 #elif UINTPTR_MAX == 0xFFFFFFFFFFFFFFFF
 // 64-bit system
 typedef long long I;
 typedef double R;
-#define PRI_I PRId64
+#define PRI_I "lld"
 #else
 #error "Unsupported system architecture"
 #endif
