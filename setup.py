@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import os
 import platform
-import shutil
 from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext as _build_ext
 
@@ -97,8 +96,9 @@ class BuildExtWithSharedLibs(_build_ext):
                 build_temp=self.build_lib,
                 target_lang=None,
             )
-        
+
         ext.sources = []
+
 
 # Create extensions for component files (to be built as shared libraries)
 c_extensions = []
