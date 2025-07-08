@@ -137,7 +137,12 @@ class BuildExtWithSharedLibs(_build_ext):
                 linker_cmd = ["link.exe", "/DLL", "/OUT:" + output, obj_file]
 
             print(f"Building shared library (link): {' '.join(linker_cmd)}")
-            subprocess.run(linker_cmd, check=True)
+            try:
+                subprocess.run(linker_cmd, check=True)
+            except subprocess.CalledProcessError as e:
+                print(f"stdout: {e.stdout.decode('utf-8')}")
+                print(f"stderr: {e.stderr.decode('utf-8')}")
+                raise e
 
     def build_shared_lib_unix(self, source, output, include_dirs):
         """Build shared library on Unix-like systems using the build_ext compiler"""
@@ -153,7 +158,12 @@ class BuildExtWithSharedLibs(_build_ext):
         cmd.append(source)
 
         print(f"Building shared library: {' '.join(cmd)}")
-        subprocess.run(cmd, check=True)
+        try:
+            subprocess.run(cmd, check=True)
+        except subprocess.CalledProcessError as e:
+            print(f"stdout: {e.stdout.decode('utf-8')}")
+            print(f"stderr: {e.stderr.decode('utf-8')}")
+            raise e
 
 
 # Create extensions for component files (to be built as shared libraries)
