@@ -6,6 +6,8 @@
 *.so
 build/*
 dist/*
+*.dll
+*.pyd
 
 # python
 .venv*
