@@ -73,7 +73,5 @@ py_extension = Extension(
 # Most configuration is now in pyproject.toml
 setup(
     name="dynamical_systems",
-    # Point to the source directory for the Python package
-    package_dir={"dynamical_systems": "src/python"},
     ext_modules=[py_extension] + c_extensions,
 )

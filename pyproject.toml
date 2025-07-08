@@ -45,9 +45,11 @@ Issues = "https://github.com/serhii-donetskyi/dynamical-systems/issues"
 write_to = "src/python/_version.py"
 local_scheme = "no-local-version"
 
-[tool.setuptools.packages.find]
-where = ["src"]
-include = ["python*"]
+[tool.setuptools]
+packages = ["dynamical_systems"]
+
+[tool.setuptools.package-dir]
+dynamical_systems = "src/python"
 
 [tool.setuptools.package-data]
 dynamical_systems = ["*.so", "**/*.so"]
