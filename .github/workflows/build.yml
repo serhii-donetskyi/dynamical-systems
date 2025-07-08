@@ -164,18 +164,18 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  publish:
-    needs: [build-wheels, build-executables]
-    runs-on: ubuntu-latest
-    if: github.event_name == 'release'
-    steps:
-    - name: Download all wheels
-      uses: actions/download-artifact@v3
-      with:
-        path: dist
+  # publish:
+  #   needs: [build-wheels, build-executables]
+  #   runs-on: ubuntu-latest
+  #   if: github.event_name == 'release'
+  #   steps:
+  #   - name: Download all wheels
+  #     uses: actions/download-artifact@v3
+  #     with:
+  #       path: dist
 
-    - name: Publish to PyPI
-      uses: pypa/gh-action-pypi-publish@v1.8.10
-      with:
-        password: ${{ secrets.PYPI_API_TOKEN }}
-        packages_dir: dist/**/
+  #   - name: Publish to PyPI
+  #     uses: pypa/gh-action-pypi-publish@v1.8.10
+  #     with:
+  #       password: ${{ secrets.PYPI_API_TOKEN }}
+  #       packages_dir: dist/**/

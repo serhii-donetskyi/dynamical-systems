@@ -9,34 +9,45 @@ block_cipher = None
 # Get the current directory
 current_dir = os.getcwd()
 
-# Collect all .so files (C extensions)
+# Find the dynamical_systems module directory automatically
+try:
+    import dynamical_systems
+    module_dir = os.path.dirname(dynamical_systems.__file__)
+    print(f"Found dynamical_systems module at: {module_dir}")
+except ImportError:
+    raise RuntimeError("dynamical_systems module not found. Please install it first with 'pip install -e .'")
+
+# Add module directory to pathex
+pathex_dirs = [current_dir, module_dir]
+
+# Collect all binaries and data files from the module directory
 binaries = []
-for root, dirs, files in os.walk(os.path.join(current_dir, 'dynamical_systems')):
-    for file in files:
-        if file.endswith('.so'):
-            full_path = os.path.join(root, file)
-            # Create the destination path relative to dynamical_systems
-            rel_path = os.path.relpath(full_path, current_dir)
-            binaries.append((full_path, os.path.dirname(rel_path)))
-
-# Collect static files for the UI
 datas = []
-ui_static_path = os.path.join(current_dir, 'dynamical_systems', 'ui', 'static')
-ui_templates_path = os.path.join(current_dir, 'dynamical_systems', 'ui', 'templates')
 
-if os.path.exists(ui_static_path):
-    for root, dirs, files in os.walk(ui_static_path):
-        for file in files:
-            full_path = os.path.join(root, file)
-            rel_path = os.path.relpath(full_path, current_dir)
-            datas.append((full_path, os.path.dirname(rel_path)))
+# Walk through the entire module directory to collect everything
+for root, dirs, files in os.walk(module_dir):
+    for file in files:
+        full_path = os.path.join(root, file)
+        rel_path = os.path.relpath(full_path, module_dir)
+        dest_path = os.path.join('dynamical_systems', rel_path)
+        
+        if file.endswith(('.so', '.pyd', '.dll')):
+            # Binary files (C extensions)
+            binaries.append((full_path, os.path.dirname(dest_path)))
+        elif not file.endswith(('.pyc', '.pyo')) and not file.startswith('.'):
+            # Data files (Python files, templates, static files, etc.)
+            # Skip compiled Python files and hidden files
+            datas.append((full_path, os.path.dirname(dest_path)))
 
-if os.path.exists(ui_templates_path):
-    for root, dirs, files in os.walk(ui_templates_path):
-        for file in files:
-            full_path = os.path.join(root, file)
-            rel_path = os.path.relpath(full_path, current_dir)
-            datas.append((full_path, os.path.dirname(rel_path)))
+print(f"Collected {len(binaries)} binary files:")
+for binary in binaries:
+    print(f"  {binary[0]} -> {binary[1]}")
+
+print(f"Collected {len(datas)} data files:")
+for data in datas[:10]:  # Show first 10 to avoid spam
+    print(f"  {data[0]} -> {data[1]}")
+if len(datas) > 10:
+    print(f"  ... and {len(datas) - 10} more files")
 
 # Hidden imports for Flask and other dependencies
 hiddenimports = [
@@ -53,9 +64,14 @@ hiddenimports = [
     'dynamical_systems._dynamical_systems',
 ]
 
+# Use the module's __main__.py
+main_script = os.path.join(module_dir, '__main__.py')
+if not os.path.exists(main_script):
+    raise RuntimeError(f"Main script not found at {main_script}")
+
 a = Analysis(
-    ['dynamical_systems/__main__.py'],
-    pathex=[current_dir],
+    [main_script],
+    pathex=pathex_dirs,
     binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
