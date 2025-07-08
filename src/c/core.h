@@ -8,12 +8,12 @@
 // Macro to select integer type matching pointer size
 #if UINTPTR_MAX == 0xFFFFFFFF
 // 32-bit system
-typedef int32_t I;
+typedef int I;
 typedef float R;
 #define PRI_I PRId32
 #elif UINTPTR_MAX == 0xFFFFFFFFFFFFFFFF
 // 64-bit system
-typedef int64_t I;
+typedef long long I;
 typedef double R;
 #define PRI_I PRId64
 #else

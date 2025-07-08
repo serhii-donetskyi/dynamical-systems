@@ -5,6 +5,22 @@
 #include <Python.h>
 #include <string.h>
 
+I PyLong_AsI(PyObject *value) {
+  #if UINTPTR_MAX == 0xFFFFFFFF
+    return PyLong_AsLong(value);
+  #else
+    return PyLong_AsLongLong(value);
+  #endif
+}
+
+PyObject *PyLong_FromI(I value) {
+  #if UINTPTR_MAX == 0xFFFFFFFF
+    return PyLong_FromLong(value);
+  #else
+    return PyLong_FromLongLong(value);
+  #endif
+}
+
 argument_t *py_copy_and_parse_args(PyObject *args, PyObject *kwargs,
                                    const argument_t *args_in) {
   I arg_size = 0;
@@ -40,7 +56,7 @@ argument_t *py_copy_and_parse_args(PyObject *args, PyObject *kwargs,
     switch (args_out[i].type) {
     case INTEGER:
       if (PyLong_Check(value)) {
-        args_out[i].i = PyLong_AsLong(value);
+        args_out[i].i = PyLong_AsI(value);
       } else {
         PyErr_Format(PyExc_TypeError, "Argument '%s' must be an integer",
                      args_out[i].name);
@@ -94,7 +110,7 @@ PyObject *py_get_list_from_args(const argument_t *args_in, I return_values) {
     switch (args_in[i].type) {
     case INTEGER:
       if (return_values) {
-        value = PyLong_FromLong(args_in[i].i);
+        value = PyLong_FromI(args_in[i].i);
       } else {
         value = (PyObject *)&PyLong_Type;
         Py_INCREF(value);
