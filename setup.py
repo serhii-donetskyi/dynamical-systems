@@ -62,19 +62,18 @@ class BuildExtWithSharedLibs(_build_ext):
         package_dir = os.path.join(self.build_lib, *ext.name.split(".")[:-1])
         os.makedirs(package_dir, exist_ok=True)
 
-        # Get the output filename for the shared library
-        lib_fname = f"{ext.name.split('.')[-1]}.so"
-
-        output_path = os.path.join(package_dir, lib_fname)
+        obj_file_path = os.path.join(package_dir, f"{ext.name.split('.')[-1]}.obj")
 
         # Compile the shared library
         if platform.system() == "Windows":
-            self.build_shared_lib_windows(sources[0], output_path, ext.include_dirs)
+            self.build_shared_lib_windows(sources[0], obj_file_path, ext.include_dirs)
         else:
-            self.build_shared_lib_unix(sources[0], output_path, ext.include_dirs)
+            self.build_shared_lib_unix(sources[0], obj_file_path, ext.include_dirs)
 
         # Create a copy/symlink with the expected Python extension name for the build system
         expected_name = self.get_ext_fullpath(ext.name)
+        if platform.system() == "Windows":
+            expected_name = expected_name.replace(".pyd", ".dll")
         if os.path.exists(expected_name):
             os.remove(expected_name)
 
@@ -82,7 +81,7 @@ class BuildExtWithSharedLibs(_build_ext):
         os.makedirs(os.path.dirname(expected_name), exist_ok=True)
 
         # Copy the shared library to the expected location
-        shutil.copy2(output_path, expected_name)
+        shutil.copy2(obj_file_path, expected_name)
 
         # Clear sources to prevent double processing
         ext.sources = []

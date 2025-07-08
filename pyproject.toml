@@ -52,4 +52,4 @@ packages = ["dynamical_systems"]
 dynamical_systems = "src/python"
 
 [tool.setuptools.package-data]
-dynamical_systems = ["*.so", "**/*.so"]
+dynamical_systems = ["*.so", "**/*.so", "*.dll", "**/*.dll"]
