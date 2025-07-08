@@ -1,8 +1,13 @@
 #ifndef CORE_H
 #define CORE_H
 
+#include <stddef.h>
+
 typedef long I;
 typedef double R;
+
+_Static_assert(sizeof(void*) == sizeof(I), "void* and I must have the same size");
+_Static_assert(sizeof(I) == sizeof(R), "I and R must have the same size");
 
 // Result
 typedef struct result_t {
@@ -32,7 +37,7 @@ typedef struct argument_t {
 } argument_t;
 
 // Allocators
-typedef void *(*malloc_fn)(unsigned long size);
+typedef void *(*malloc_fn)(size_t size);
 typedef void (*free_fn)(void *ptr);
 
 // ODE
