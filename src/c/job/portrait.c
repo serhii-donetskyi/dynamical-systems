@@ -55,7 +55,7 @@ static result_t job(ode_t *restrict ode, solver_t *restrict solver,
     result.message = "Failed to write to file";
   }
   for (I i = 0; i < ode->x_size; i++)
-    if (fprintf(file, " x[%ld]", i) < 0) {
+    if (fprintf(file, " x[%" PRI_I "]", i) < 0) {
       result.type = FAILURE;
       result.message = "Failed to write to file";
       break;
@@ -68,7 +68,7 @@ static result_t job(ode_t *restrict ode, solver_t *restrict solver,
   if (result.message)
     result.type = FAILURE;
 
-  printf("%ld\n", progress);
+  printf("%" PRI_I "\n", progress);
   fflush(stdout);
 
   for (; steps < MAX_STEPS; ++steps) {
@@ -80,7 +80,7 @@ static result_t job(ode_t *restrict ode, solver_t *restrict solver,
     progress_next = (I)((ode->t - t_start) / (t_end - t_start) * 100);
     while (progress < progress_next) {
       progress++;
-      printf("%ld\n", progress);
+      printf("%" PRI_I "\n", progress);
       fflush(stdout);
     }
     result.message =
@@ -104,7 +104,7 @@ static result_t job(ode_t *restrict ode, solver_t *restrict solver,
   if (result.type == SUCCESS) {
     while (progress < 100) {
       progress++;
-      printf("%ld\n", progress);
+      printf("%" PRI_I "\n", progress);
       fflush(stdout);
     }
   }
