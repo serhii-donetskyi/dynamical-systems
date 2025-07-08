@@ -6,19 +6,19 @@
 #include <string.h>
 
 I PyLong_AsI(PyObject *value) {
-  #if UINTPTR_MAX == 0xFFFFFFFF
-    return PyLong_AsLong(value);
-  #else
-    return PyLong_AsLongLong(value);
-  #endif
+#if UINTPTR_MAX == 0xFFFFFFFF
+  return PyLong_AsLong(value);
+#else
+  return PyLong_AsLongLong(value);
+#endif
 }
 
 PyObject *PyLong_FromI(I value) {
-  #if UINTPTR_MAX == 0xFFFFFFFF
-    return PyLong_FromLong(value);
-  #else
-    return PyLong_FromLongLong(value);
-  #endif
+#if UINTPTR_MAX == 0xFFFFFFFF
+  return PyLong_FromLong(value);
+#else
+  return PyLong_FromLongLong(value);
+#endif
 }
 
 argument_t *py_copy_and_parse_args(PyObject *args, PyObject *kwargs,
