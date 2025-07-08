@@ -31,15 +31,12 @@ for component in ["ode", "solver", "job"]:
             component_path = os.path.join(component_dir, fname)
             components[component][name] = factories[component](component_path)
 
-
-def generate_module_cmd(ode, solver, job):
+def generate_cmd(ode, solver, job):
     ode_args = [f"{arg['name']}={arg['value']}" for arg in ode.get_arguments()]
     solver_args = [f"{arg['name']}={arg['value']}" for arg in solver.get_arguments()]
     job_args = [f"{arg['name']}={arg['value']}" for arg in job.get_arguments()]
     return [
         sys.executable,
-        "-m",
-        "dynamical_systems",
         "run",
         "--ode",
         ode.get_factory().get_name(),
@@ -60,6 +57,11 @@ def generate_module_cmd(ode, solver, job):
         "--job-args",
         *job_args,
     ]
+
+def generate_module_cmd(ode, solver, job):
+    cmd = generate_cmd(ode, solver, job)
+    cmd = cmd[:1] + ["-m", "dynamical_systems"] + cmd[1:]
+    return cmd
 
 
 __all__ = [

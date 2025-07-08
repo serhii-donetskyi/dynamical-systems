@@ -171,7 +171,11 @@ def main():
 
     args = parser.parse_args()
     if args.command == "run":
-        execute_run(args)
+        try:
+            execute_run(args)
+        except Exception as e:
+            print(e, file=sys.stderr)
+            sys.exit(1)
     elif args.command == "ui":
         execute_ui(args)
     else:

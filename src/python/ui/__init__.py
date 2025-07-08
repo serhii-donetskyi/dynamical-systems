@@ -22,7 +22,7 @@ import webbrowser
 import threading
 import time
 
-from dynamical_systems import components, generate_module_cmd
+from dynamical_systems import components, generate_cmd
 
 app = Flask(__name__)
 CORS(app)
@@ -174,8 +174,9 @@ def run_job(ode_name, solver_name, job_name):
         except Exception as e:
             raise type(e)(f"Job Error: {e}") from e
 
+        cmd = generate_cmd(ode, solver, job)
         process = subprocess.Popen(
-            generate_module_cmd(ode, solver, job),
+            cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
@@ -214,6 +215,7 @@ def job_event_stream(job_id):
             return
 
         process = processes[job_id]
+        progress = None
 
         if not process:
             status["status"] = "error"
@@ -278,6 +280,8 @@ def job_event_stream(job_id):
                 status["status"] = "running" if progress < 100 else "completed"
                 status["message"] = message
                 yield f"data: {json.dumps(status)}\n\n"
+            if progress is None or progress < 100:
+                raise RuntimeError(process.stderr.read())
         except Exception as e:
             status["status"] = "error"
             status["message"] = f"Error: {str(e)}"
