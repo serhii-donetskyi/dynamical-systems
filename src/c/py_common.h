@@ -4,6 +4,9 @@
 #include "core.h"
 #include <Python.h>
 
+I PyLong_AsI(PyObject *value);
+PyObject *PyLong_FromI(I value);
+
 // Copies the arguments and returns a new list of dictionaries, or NULL on error
 // args: a list of dictionaries of the arguments
 // kwargs: a dictionary of the arguments

@@ -71,7 +71,7 @@ static PyObject *OdeObjectPy_get_x_size(OdeObjectPy *self,
     PyErr_SetString(PyExc_RuntimeError, "Invalid ode");
     return NULL;
   }
-  return PyLong_FromLong(self->ode->x_size);
+  return PyLong_FromI(self->ode->x_size);
 }
 
 static PyObject *OdeObjectPy_get_p_size(OdeObjectPy *self,
@@ -80,7 +80,7 @@ static PyObject *OdeObjectPy_get_p_size(OdeObjectPy *self,
     PyErr_SetString(PyExc_RuntimeError, "Invalid ode");
     return NULL;
   }
-  return PyLong_FromLong(self->ode->p_size);
+  return PyLong_FromI(self->ode->p_size);
 }
 
 static PyObject *OdeObjectPy_get_t(OdeObjectPy *self,
