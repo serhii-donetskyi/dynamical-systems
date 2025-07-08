@@ -90,80 +90,31 @@ class BuildExtWithSharedLibs(_build_ext):
 
     def build_shared_lib_windows(self, source, output, include_dirs):
         """Build shared library on Windows using the build_ext compiler"""
-        import tempfile
-
-        # MSVC compiler has different attributes than Unix compiler
-        # Try to get the compiler command, with fallbacks for different distutils versions
-        if hasattr(self.compiler, "compiler_so") and self.compiler.compiler_so:
-            compiler_cmd = self.compiler.compiler_so[0]
-        elif hasattr(self.compiler, "cc") and self.compiler.cc:
-            compiler_cmd = self.compiler.cc
-        elif hasattr(self.compiler, "compile"):
-            # For MSVC, often just use "cl.exe" as fallback
-            compiler_cmd = "cl.exe"
-        else:
-            compiler_cmd = "cl.exe"
-
-        # Create temp directory for object files
-        with tempfile.TemporaryDirectory() as temp_dir:
-            obj_file = os.path.join(temp_dir, "temp.obj")
-
-            # Compile to object file using the build_ext compiler
-            compile_cmd = [compiler_cmd, "/c", "/Fo" + obj_file]
-
-            # Add include directories
-            for include_dir in include_dirs:
-                compile_cmd.append(f"/I{include_dir}")
-
-            # Add our compile args
-            compile_cmd.extend(compile_args)
-            compile_cmd.append(source)
-
-            print(f"Building shared library (compile): {' '.join(compile_cmd)}")
-            subprocess.run(compile_cmd, check=True)
-
-            # Link to DLL - for MSVC, we can try to find the linker
-            if hasattr(self.compiler, "linker_so") and self.compiler.linker_so:
-                linker_cmd = [
-                    self.compiler.linker_so[0],
-                    "/DLL",
-                    "/OUT:" + output,
-                    obj_file,
-                ]
-            elif hasattr(self.compiler, "ld") and self.compiler.ld:
-                linker_cmd = [self.compiler.ld, "/DLL", "/OUT:" + output, obj_file]
-            else:
-                # Fallback to link.exe
-                linker_cmd = ["link.exe", "/DLL", "/OUT:" + output, obj_file]
-
-            print(f"Building shared library (link): {' '.join(linker_cmd)}")
-            try:
-                subprocess.run(linker_cmd, check=True)
-            except subprocess.CalledProcessError as e:
-                print(f"stdout: {e.stdout.decode('utf-8')}")
-                print(f"stderr: {e.stderr.decode('utf-8')}")
-                raise e
+        print(f"Building shared library: {source} -> {output}")
+        self.compiler.link_shared_object(
+            objects=[],
+            output_filename=output,
+            export_symbols=None,
+            debug=False,
+            extra_preargs=compile_args + [f"/I{inc}" for inc in include_dirs] + [source],
+            extra_postargs=[],
+            build_temp=None,
+            target_lang=None
+        )
 
     def build_shared_lib_unix(self, source, output, include_dirs):
         """Build shared library on Unix-like systems using the build_ext compiler"""
-        # Use the same compiler that build_ext uses
-        compiler_cmd = self.compiler.compiler_so[0]  # Get the base compiler command
-
-        cmd = [compiler_cmd, "-shared", "-o", output]
-
-        for include_dir in include_dirs:
-            cmd.append(f"-I{include_dir}")
-
-        cmd.extend(compile_args)
-        cmd.append(source)
-
-        print(f"Building shared library: {' '.join(cmd)}")
-        try:
-            subprocess.run(cmd, check=True)
-        except subprocess.CalledProcessError as e:
-            print(f"stdout: {e.stdout.decode('utf-8')}")
-            print(f"stderr: {e.stderr.decode('utf-8')}")
-            raise e
+        print(f"Building shared library: {source} -> {output}")
+        self.compiler.link_shared_object(
+            objects=[],
+            output_filename=output,
+            export_symbols=None,
+            debug=False,
+            extra_preargs=compile_args + [f"-I{inc}" for inc in include_dirs] + [source],
+            extra_postargs=[],
+            build_temp=None,
+            target_lang=None
+        )
 
 
 # Create extensions for component files (to be built as shared libraries)
