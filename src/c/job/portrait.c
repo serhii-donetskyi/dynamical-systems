@@ -9,13 +9,13 @@
 // Cross-platform safe error string function
 static const char *safe_strerror(int errnum) {
 #ifdef _MSC_VER
-    static char buffer[256];
-    if (strerror_s(buffer, sizeof(buffer), errnum) == 0) {
-        return buffer;
-    }
-    return "Unknown error";
+  static char buffer[256];
+  if (strerror_s(buffer, sizeof(buffer), errnum) == 0) {
+    return buffer;
+  }
+  return "Unknown error";
 #else
-    return strerror(errnum);
+  return strerror(errnum);
 #endif
 }
 
