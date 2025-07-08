@@ -9,7 +9,6 @@ from flask import (
     render_template,
     request,
     jsonify,
-    send_from_directory,
     Response,
 )
 from flask_cors import CORS
@@ -311,7 +310,7 @@ def main(port=5001, debug=False):
     print(f"  ODEs: {list(components['ode'])}")
     print(f"  Solvers: {list(components['solver'])}")
     print(f"  Jobs: {list(components['job'])}")
-    print(f"\nServer starting... Opening browser automatically!")
+    print("\nServer starting... Opening browser automatically!")
     print(f"Access the application at: http://localhost:{port}")
 
     # Function to open browser after a short delay

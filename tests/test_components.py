@@ -1,4 +1,3 @@
-import pytest
 from dynamical_systems import components
 
 
