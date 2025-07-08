@@ -15,7 +15,7 @@ static void fn(const ode_t *restrict self, R t, const R *restrict x,
   }
 }
 
-static result_t create(const argument_t *restrict args);
+static result_t create(const argument_t *args);
 static void destroy(ode_t *ode);
 
 ode_output_t ode_output = {
@@ -32,7 +32,7 @@ ode_output_t ode_output = {
     .destroy = destroy,
 };
 
-static result_t create(const argument_t *restrict args) {
+static result_t create(const argument_t *args) {
   const I n = args[0].i;
   if (n <= 0 || n > 100) {
     return (result_t){.type = FAILURE,
