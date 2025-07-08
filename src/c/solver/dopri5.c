@@ -44,6 +44,34 @@
 #define E6 (22.0 / 525.0)
 #define E7 (-1.0 / 40.0)
 
+static result_t set_data(solver_t *self, const ode_t *ode);
+static result_t create(const argument_t *args);
+static void destroy(solver_t *solver);
+
+DS_EXPORT
+solver_output_t solver_output = {
+    .name = "dopri5",
+    .args = (argument_t[]){{
+                               .name = "h_max",
+                               .type = REAL,
+                               .r = 0.1,
+                           },
+                           {
+                               .name = "eps",
+                               .type = REAL,
+                               .r = 1e-3,
+                           },
+                           {
+                               .name = 0,
+                               .type = 0,
+                               .i = 0,
+                           }},
+    .malloc = malloc,
+    .free = free,
+    .create = create,
+    .destroy = destroy,
+};
+
 static R max_of_three(R v1, R v2, R v3) { return fmax(fmax(v1, v2), v3); }
 
 static const char *step(solver_t *restrict self, const ode_t *restrict ode,
@@ -168,33 +196,6 @@ static const char *step(solver_t *restrict self, const ode_t *restrict ode,
 
 #undef fn
 }
-
-static result_t set_data(solver_t *self, const ode_t *ode);
-static result_t create(const argument_t *args);
-static void destroy(solver_t *solver);
-
-solver_output_t solver_output = {
-    .name = "dopri5",
-    .args = (argument_t[]){{
-                               .name = "h_max",
-                               .type = REAL,
-                               .r = 0.1,
-                           },
-                           {
-                               .name = "eps",
-                               .type = REAL,
-                               .r = 1e-3,
-                           },
-                           {
-                               .name = 0,
-                               .type = 0,
-                               .i = 0,
-                           }},
-    .malloc = malloc,
-    .free = free,
-    .create = create,
-    .destroy = destroy,
-};
 
 static result_t set_data(solver_t *self, const ode_t *ode) {
   const I n = ode->x_size;

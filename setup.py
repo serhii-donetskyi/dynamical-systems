@@ -58,86 +58,47 @@ class BuildExtWithSharedLibs(_build_ext):
         if not sources:
             return
 
-        # Create the package directory structure
-        package_dir = os.path.join(self.build_lib, *ext.name.split(".")[:-1])
-        os.makedirs(package_dir, exist_ok=True)
-
-        obj_file_path = os.path.join(package_dir, f"{ext.name.split('.')[-1]}.obj")
-
-        # Compile the shared library
-        if platform.system() == "Windows":
-            self.build_shared_lib_windows(sources[0], obj_file_path, ext.include_dirs)
-        else:
-            self.build_shared_lib_unix(sources[0], obj_file_path, ext.include_dirs)
-
-        # Create a copy/symlink with the expected Python extension name for the build system
         expected_name = self.get_ext_fullpath(ext.name)
-        if platform.system() == "Windows":
-            expected_name = expected_name.replace(".pyd", ".dll")
-        if os.path.exists(expected_name):
-            os.remove(expected_name)
-
         # Create the directory for the expected file if it doesn't exist
         os.makedirs(os.path.dirname(expected_name), exist_ok=True)
 
-        # Copy the shared library to the expected location
-        shutil.copy2(obj_file_path, expected_name)
+        # Step 1: Compile sources to object files
+        print(f"Compiling {sources} for {ext.name}")
+        objects = self.compiler.compile(
+            sources=sources,
+            output_dir=self.build_lib,
+            include_dirs=ext.include_dirs,
+            extra_preargs=compile_args,
+        )
 
-        # Clear sources to prevent double processing
+        # Step 2: Link object files into shared library
+        print(f"Linking to {expected_name}")
+        if platform.system() == "Windows":
+            # For Windows, use /LD flag to create DLL
+            self.compiler.link_shared_object(
+                objects=objects,
+                output_filename=expected_name,
+                export_symbols=None,
+                debug=False,
+                extra_preargs=[],
+                extra_postargs=[],
+                build_temp=self.build_lib,
+                target_lang=None,
+            )
+        else:
+            # For Unix-like systems, use -shared flag
+            self.compiler.link_shared_object(
+                objects=objects,
+                output_filename=expected_name,
+                export_symbols=None,
+                debug=False,
+                extra_preargs=[],
+                extra_postargs=[],
+                build_temp=self.build_lib,
+                target_lang=None,
+            )
+        
         ext.sources = []
-
-    def build_shared_lib_windows(self, source, output, include_dirs):
-        """Build shared library on Windows using the build_ext compiler"""
-        import tempfile
-
-        # Create temp directory for object files
-        with tempfile.TemporaryDirectory() as temp_dir:
-            print(f"Compiling {source}")
-            objects = self.compiler.compile(
-                sources=[source],
-                output_dir=temp_dir,
-                include_dirs=include_dirs,
-                extra_preargs=compile_args,
-            )
-
-            print(f"Linking to {output}")
-            self.compiler.link_shared_object(
-                objects=objects,
-                output_filename=output,
-                export_symbols=None,
-                debug=False,
-                extra_preargs=[],
-                extra_postargs=[],
-                build_temp=temp_dir,
-                target_lang=None,
-            )
-
-    def build_shared_lib_unix(self, source, output, include_dirs):
-        """Build shared library on Unix-like systems using the build_ext compiler"""
-        import tempfile
-
-        # Create temp directory for object files
-        with tempfile.TemporaryDirectory() as temp_dir:
-            print(f"Compiling {source}")
-            objects = self.compiler.compile(
-                sources=[source],
-                output_dir=temp_dir,
-                include_dirs=include_dirs,
-                extra_preargs=compile_args,
-            )
-
-            print(f"Linking to {output}")
-            self.compiler.link_shared_object(
-                objects=objects,
-                output_filename=output,
-                export_symbols=None,
-                debug=False,
-                extra_preargs=[],
-                extra_postargs=[],
-                build_temp=temp_dir,
-                target_lang=None,
-            )
-
 
 # Create extensions for component files (to be built as shared libraries)
 c_extensions = []

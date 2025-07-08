@@ -54,6 +54,7 @@ static result_t set_data(solver_t *self, const ode_t *ode);
 static result_t create(const argument_t *args);
 static void destroy(solver_t *solver);
 
+DS_EXPORT
 solver_output_t solver_output = {
     .name = "rk4",
     .args = (argument_t[]){{

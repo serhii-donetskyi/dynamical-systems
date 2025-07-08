@@ -124,6 +124,7 @@ static result_t job(ode_t *restrict ode, solver_t *restrict solver,
   return result;
 }
 
+DS_EXPORT
 job_output_t job_output = {
     .name = "portrait",
     .args = (argument_t[]){{

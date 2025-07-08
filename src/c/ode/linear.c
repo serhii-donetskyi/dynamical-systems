@@ -18,6 +18,7 @@ static void fn(const ode_t *restrict self, R t, const R *restrict x,
 static result_t create(const argument_t *args);
 static void destroy(ode_t *ode);
 
+DS_EXPORT
 ode_output_t ode_output = {
     .name = "linear",
     .args = (argument_t[]){{.name = "n", .type = INTEGER, .i = 2},
