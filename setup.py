@@ -4,7 +4,6 @@ import platform
 import shutil
 from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext as _build_ext
-import subprocess
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 src_c_dir = os.path.join("src", "c")
@@ -90,31 +89,55 @@ class BuildExtWithSharedLibs(_build_ext):
 
     def build_shared_lib_windows(self, source, output, include_dirs):
         """Build shared library on Windows using the build_ext compiler"""
-        print(f"Building shared library: {source} -> {output}")
-        self.compiler.link_shared_object(
-            objects=[],
-            output_filename=output,
-            export_symbols=None,
-            debug=False,
-            extra_preargs=compile_args + [f"/I{inc}" for inc in include_dirs] + [source],
-            extra_postargs=[],
-            build_temp=None,
-            target_lang=None
-        )
+        import tempfile
+        
+        # Create temp directory for object files
+        with tempfile.TemporaryDirectory() as temp_dir:
+            print(f"Compiling {source}")
+            objects = self.compiler.compile(
+                sources=[source],
+                output_dir=temp_dir,
+                include_dirs=include_dirs,
+                extra_preargs=compile_args,
+            )
+            
+            print(f"Linking to {output}")
+            self.compiler.link_shared_object(
+                objects=objects,
+                output_filename=output,
+                export_symbols=None,
+                debug=False,
+                extra_preargs=[],
+                extra_postargs=[],
+                build_temp=temp_dir,
+                target_lang=None,
+            )
 
     def build_shared_lib_unix(self, source, output, include_dirs):
         """Build shared library on Unix-like systems using the build_ext compiler"""
-        print(f"Building shared library: {source} -> {output}")
-        self.compiler.link_shared_object(
-            objects=[],
-            output_filename=output,
-            export_symbols=None,
-            debug=False,
-            extra_preargs=compile_args + [f"-I{inc}" for inc in include_dirs] + [source],
-            extra_postargs=[],
-            build_temp=None,
-            target_lang=None
-        )
+        import tempfile
+        
+        # Create temp directory for object files  
+        with tempfile.TemporaryDirectory() as temp_dir:
+            print(f"Compiling {source}")
+            objects = self.compiler.compile(
+                sources=[source],
+                output_dir=temp_dir,
+                include_dirs=include_dirs,
+                extra_preargs=compile_args,
+            )
+            
+            print(f"Linking to {output}")
+            self.compiler.link_shared_object(
+                objects=objects,
+                output_filename=output,
+                export_symbols=None,
+                debug=False,
+                extra_preargs=[],
+                extra_postargs=[],
+                build_temp=temp_dir,
+                target_lang=None,
+            )
 
 
 # Create extensions for component files (to be built as shared libraries)
