@@ -1,7 +1,7 @@
 import pytest
 import os
 import subprocess
-from dynamical_systems import Job, generate_module_cmd
+from dynamical_systems import Job, generate_cmd
 
 
 def test_job(job_factory, ode, solver):
@@ -37,7 +37,7 @@ def test_module_cmd(job_factory, ode, solver):
     file = "test_progress.txt"
     job = job_factory.create(t_step=0.5, t_end=1.0, file=file)
     process = subprocess.run(
-        generate_module_cmd(ode, solver, job), text=True, capture_output=True
+        generate_cmd(ode, solver, job), text=True, capture_output=True
     )
 
     # Better error reporting

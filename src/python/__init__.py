@@ -38,6 +38,7 @@ def generate_cmd(ode, solver, job):
     job_args = [f"{arg['name']}={arg['value']}" for arg in job.get_arguments()]
     return [
         sys.executable,
+        *(["-m", "dynamical_systems"] if "python" in sys.executable else []),
         "run",
         "--ode",
         ode.get_factory().get_name(),
@@ -59,13 +60,6 @@ def generate_cmd(ode, solver, job):
         *job_args,
     ]
 
-
-def generate_module_cmd(ode, solver, job):
-    cmd = generate_cmd(ode, solver, job)
-    cmd = cmd[:1] + ["-m", "dynamical_systems"] + cmd[1:]
-    return cmd
-
-
 __all__ = [
     "OdeFactory",
     "SolverFactory",
@@ -74,7 +68,7 @@ __all__ = [
     "Solver",
     "Job",
     "components",
-    "generate_module_cmd",
+    "generate_cmd",
 ]
 
 try:
