@@ -1,7 +1,6 @@
 import pytest
 import os
 import subprocess
-import time
 from dynamical_systems import Job, generate_module_cmd
 
 

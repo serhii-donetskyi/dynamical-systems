@@ -186,7 +186,6 @@ class DynamicalSystemsUI {
                 this.componentConfigs.ode[componentName].parameters = {};
             }
         }
-        section.style.display = 'block'; // Show the section
 
         const fields = this.components[componentType].arguments.fields;
         const id = fields.id;
@@ -200,6 +199,12 @@ class DynamicalSystemsUI {
 
         try {
             const argumentTypes = await this.fetchAPI(`/api/get-${componentType}-arguments/${componentName}`);
+            if (argumentTypes.length === 0) {
+                section.style.display = 'none';
+                this.generateStateFields();
+                return;
+            }
+            section.style.display = 'block'; // Show the section
             argumentTypes.forEach(({name: argName, type: argType}) => {
                 const fieldDiv = document.createElement('div');
                 fieldDiv.className = 'argument-field';
