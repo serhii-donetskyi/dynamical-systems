@@ -1,9 +1,10 @@
 #ifndef CORE_H
 #define CORE_H
 
-#include "dynlib.h"
 #include <stddef.h>
 #include <stdint.h>
+
+#include "dynlib.h"
 
 // Macro to select integer type matching pointer size
 #if UINTPTR_MAX == 0xFFFFFFFF

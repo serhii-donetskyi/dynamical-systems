@@ -1,10 +1,11 @@
 #ifndef PY_ODE_H
 #define PY_ODE_H
 
+#include <Python.h>
+
 #include "core.h"
 #include "dynlib.h"
 #include "structmember.h"
-#include <Python.h>
 
 // Python wrapper for ode_output_t
 typedef struct {

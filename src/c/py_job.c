@@ -1,10 +1,12 @@
 #include "py_job.h"
+
+#include <stdlib.h>
+#include <string.h>
+
 #include "dynlib.h"
 #include "py_common.h"
 #include "py_ode.h"
 #include "py_solver.h"
-#include <stdlib.h>
-#include <string.h>
 
 // JobObjectPy implementation
 static PyObject *JobObjectPy_new(PyTypeObject *type, PyObject *args,

@@ -1,10 +1,11 @@
 #ifndef PY_SOLVER_H
 #define PY_SOLVER_H
 
+#include <Python.h>
+
 #include "core.h"
 #include "dynlib.h"
 #include "structmember.h"
-#include <Python.h>
 
 // Solver
 typedef struct {

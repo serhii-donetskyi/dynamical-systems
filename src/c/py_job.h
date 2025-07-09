@@ -1,10 +1,11 @@
 #ifndef PY_JOB_H
 #define PY_JOB_H
 
+#include <Python.h>
+
 #include "core.h"
 #include "dynlib.h"
 #include "structmember.h"
-#include <Python.h>
 
 typedef struct {
   PyObject_HEAD job_output_t *output; // Pointer to the C job_output_t struct

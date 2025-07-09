@@ -1,8 +1,10 @@
 #include "py_ode.h"
-#include "dynlib.h"
-#include "py_common.h"
+
 #include <stdlib.h>
 #include <string.h>
+
+#include "dynlib.h"
+#include "py_common.h"
 
 // OdeObjectPy implementation
 static PyObject *OdeObjectPy_new(PyTypeObject *type, PyObject *args,
@@ -237,7 +239,8 @@ static PyObject *OdeObjectPy_set_p(OdeObjectPy *self, PyObject *args,
     Py_DECREF(item);
 
     if (PyErr_Occurred()) {
-      // PyFloat_AsDouble failed, but let's provide a clearer error
+      // PyFloat_AsDouble failed, but let's provide a clearer
+      // error
       PyErr_Format(PyExc_ValueError,
                    "Element at index %zd cannot be converted to float", i);
       return NULL;

@@ -1,9 +1,11 @@
 #include "py_solver.h"
+
+#include <stdlib.h>
+#include <string.h>
+
 #include "dynlib.h"
 #include "py_common.h"
 #include "py_ode.h"
-#include <stdlib.h>
-#include <string.h>
 
 // SolverObjectPy implementation
 static PyObject *SolverObjectPy_new(PyTypeObject *type, PyObject *args,

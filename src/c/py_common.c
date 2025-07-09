@@ -1,9 +1,11 @@
 #include "py_common.h"
+
+#include <Python.h>
+#include <string.h>
+
 #include "core.h"
 #include "py_ode.h"
 #include "py_solver.h"
-#include <Python.h>
-#include <string.h>
 
 I PyLong_AsI(PyObject *value) {
 #if UINTPTR_MAX == 0xFFFFFFFF
@@ -43,15 +45,14 @@ argument_t *py_copy_and_parse_args(PyObject *args, PyObject *kwargs,
   memcpy(args_out, args_in, sizeof(argument_t) * (arg_size + 1));
 
   for (Py_ssize_t i = 0; args_out[i].name; i++) {
-
     PyObject *value = NULL;
 
     // Try to get argument from positional args first
     if (i < nargs) {
       value = PyTuple_GET_ITEM(args, i);
     }
-    // If not in positional args and we have keyword args, try to get from
-    // kwargs
+    // If not in positional args and we have keyword args, try to get
+    // from kwargs
     else if (kwargs) {
       value = PyDict_GetItemString(kwargs, args_out[i].name);
     }
