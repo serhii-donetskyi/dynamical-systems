@@ -41,8 +41,6 @@ def get_compile_args():
             "-O3",  # Maximum optimization
             "-fPIC",  # Position Independent Code
             "-ffast-math",  # Fast math (replaces deprecated -Ofast)
-            "-march=native",  # Optimize for build machine CPU
-            "-mtune=native",  # Tune for build machine CPU
             "-ffunction-sections",  # Put each function in its own section (enables --gc-sections)
             "-fdata-sections",  # Put each data item in its own section (enables --gc-sections)
             "-flto",  # Link Time Optimization
