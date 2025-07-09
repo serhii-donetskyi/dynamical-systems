@@ -53,8 +53,14 @@ def test_module_cmd(job_factory, ode, solver):
     lines = [int(line.strip()) for line in process.stdout.split("\n") if line.strip()]
     assert lines == list(range(101))
 
+
 def test_performnace(job_factory, ode_factory, solver_factory):
-    ode = ode_factory.create(n=2).set_t(0.0).set_x([0.0, 1.0]).set_p([0.0, 1.0, -1.0, 0.0])
+    ode = (
+        ode_factory.create(n=2)
+        .set_t(0.0)
+        .set_x([0.0, 1.0])
+        .set_p([0.0, 1.0, -1.0, 0.0])
+    )
     solver = solver_factory.create(h_max=0.01)
     job = job_factory.create(t_step=1e6, t_end=1e6, file="test_performance.txt")
     start_time = time.time()

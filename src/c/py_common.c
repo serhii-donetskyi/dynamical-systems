@@ -29,9 +29,10 @@ argument_t *py_copy_and_parse_args(PyObject *args, PyObject *kwargs,
 
   Py_ssize_t nargs = PyTuple_GET_SIZE(args);
   Py_ssize_t nkwargs = PyDict_Size(kwargs);
-  
+
   if (nargs + nkwargs != arg_size) {
-    PyErr_Format(PyExc_TypeError, "Expected %d arguments, got %d positional and %d keyword",
+    PyErr_Format(PyExc_TypeError,
+                 "Expected %d arguments, got %d positional and %d keyword",
                  arg_size, nargs, nkwargs);
     return NULL;
   }

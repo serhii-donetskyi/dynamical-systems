@@ -13,22 +13,22 @@ def get_compile_args():
     if platform.system() == "Windows":
         # MSVC compiler flags
         return [
-            "/O2",        # Optimize for speed (equivalent to -O3)
-            "/Ox",        # Maximum optimization (includes /O2 + more aggressive opts)
-            "/Ot",        # Favor speed over size (explicit)
-            "/Oi",        # Generate intrinsic functions (explicit)
-            "/Oy",        # Omit frame pointers (explicit)
-            "/Ob2",       # Aggressive inline expansion (explicit)
-            "/GL",        # Whole Program Optimization (Link Time Code Generation)
-            "/Gw",        # Optimize global data
-            "/GF",        # Enable read-only string pooling (explicit)
-            "/Gy",        # Enable function-level linking (explicit)
-            "/arch:AVX2", # Use AVX2 instructions (if supported)
-            "/favor:INTEL64", # Optimize for Intel x64 architecture
-            "/W3",        # Warning level 3
-            "/WX",        # Treat warnings as errors
-            "/std:c11",   # C11 standard (VS 2019+)
-            "/fp:fast",   # Fast floating point model (equivalent to -ffast-math)
+            "/O2",  # Optimize for speed (equivalent to -O3)
+            "/Ox",  # Maximum optimization (includes /O2 + more aggressive opts)
+            "/Ot",  # Favor speed over size (explicit)
+            "/Oi",  # Generate intrinsic functions (explicit)
+            "/Oy",  # Omit frame pointers (explicit)
+            "/Ob2",  # Aggressive inline expansion (explicit)
+            "/GL",  # Whole Program Optimization (Link Time Code Generation)
+            "/Gw",  # Optimize global data
+            "/GF",  # Enable read-only string pooling (explicit)
+            "/Gy",  # Enable function-level linking (explicit)
+            "/arch:AVX2",  # Use AVX2 instructions (if supported)
+            "/favor:INTEL64",  # Optimize for Intel x64 architecture
+            "/W3",  # Warning level 3
+            "/WX",  # Treat warnings as errors
+            "/std:c11",  # C11 standard (VS 2019+)
+            "/fp:fast",  # Fast floating point model (equivalent to -ffast-math)
         ]
     else:
         # GCC/Clang compiler flags for Unix-like systems
@@ -38,16 +38,16 @@ def get_compile_args():
             "-Wextra",
             "-Werror",
             "-pedantic",
-            "-O3",                  # Maximum optimization
-            "-fPIC",                # Position Independent Code
-            "-ffast-math",          # Fast math (replaces deprecated -Ofast)
-            "-march=native",        # Optimize for build machine CPU
-            "-mtune=native",        # Tune for build machine CPU
+            "-O3",  # Maximum optimization
+            "-fPIC",  # Position Independent Code
+            "-ffast-math",  # Fast math (replaces deprecated -Ofast)
+            "-march=native",  # Optimize for build machine CPU
+            "-mtune=native",  # Tune for build machine CPU
             "-ffunction-sections",  # Put each function in its own section (enables --gc-sections)
-            "-fdata-sections",      # Put each data item in its own section (enables --gc-sections)
-            "-flto",                # Link Time Optimization
-            "-funroll-loops",       # Unroll loops for speed (may increase size)
-            "-fomit-frame-pointer", # Remove frame pointers for better register usage
+            "-fdata-sections",  # Put each data item in its own section (enables --gc-sections)
+            "-flto",  # Link Time Optimization
+            "-funroll-loops",  # Unroll loops for speed (may increase size)
+            "-fomit-frame-pointer",  # Remove frame pointers for better register usage
         ]
 
 
@@ -59,17 +59,17 @@ def get_linker_args():
     if platform.system() == "Windows":
         # MSVC linker flags for enhanced optimizations
         return [
-            "/LTCG",              # Link Time Code Generation (required for /GL)
-            "/OPT:REF",           # Remove unreferenced functions and data
-            "/OPT:ICF",           # Enable identical COMDAT folding
-            "/OPT:LBR",           # Optimize for long branches (better code layout)
-            "/OPT:NOWIN98",       # Don't optimize for Windows 98 compatibility
-            "/INCREMENTAL:NO",    # Disable incremental linking for better optimization
+            "/LTCG",  # Link Time Code Generation (required for /GL)
+            "/OPT:REF",  # Remove unreferenced functions and data
+            "/OPT:ICF",  # Enable identical COMDAT folding
+            "/OPT:LBR",  # Optimize for long branches (better code layout)
+            "/OPT:NOWIN98",  # Don't optimize for Windows 98 compatibility
+            "/INCREMENTAL:NO",  # Disable incremental linking for better optimization
         ]
     else:
         # GCC/Clang linker flags for Unix-like systems
         return [
-            "-Wl,-O3",                 # Maximum linker optimizations
+            "-Wl,-O3",  # Maximum linker optimizations
         ]
 
 
