@@ -60,6 +60,7 @@ def generate_cmd(ode, solver, job):
         *job_args,
     ]
 
+
 __all__ = [
     "OdeFactory",
     "SolverFactory",
