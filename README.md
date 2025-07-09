@@ -127,7 +127,7 @@ Linear dynamical systems of the form dx/dt = Ax
 
 #### `dopri5`
 Dormand-Prince 5th-order adaptive method
-- **Parameters**: 
+- **Parameters**:
   - `h_max` (float) - maximum step size (0 < h_max < 1)
   - `eps` (float) - error tolerance (0 < eps < 1)
 
