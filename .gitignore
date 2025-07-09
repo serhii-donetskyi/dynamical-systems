@@ -18,6 +18,7 @@ _version.py
 
 # environment
 .env
+.DS_Store
 
 # pytest
 .pytest_cache*
