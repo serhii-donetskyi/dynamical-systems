@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=45,<70", "wheel", "setuptools_scm"]
+requires = ["setuptools>=45", "wheel", "setuptools_scm"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -10,7 +10,7 @@ authors = [
     {name = "Serhii Donetskyi", email = "your.email@example.com"},
 ]
 readme = "README.md"
-license = {file = "LICENSE"}
+license = "MIT"
 requires-python = ">=3.9"
 classifiers = [
     "Development Status :: 3 - Alpha",
