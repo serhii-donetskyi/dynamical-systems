@@ -69,37 +69,7 @@ jobs:
       run: |
         pytest -v
 
-  build-wheels:
-    needs: test
-    runs-on: ${{ matrix.os }}
-    if: github.event_name == 'release'
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-
-    - name: Build wheels
-      uses: pypa/cibuildwheel@v2.19.2
-      env:
-        CIBW_SKIP: "pp* *-musllinux*"  # Skip PyPy and musl builds
-        CIBW_ARCHS_LINUX: "x86_64 aarch64"
-        CIBW_ARCHS_MACOS: "x86_64 arm64"
-        CIBW_ARCHS_WINDOWS: "AMD64"
-        CIBW_PRERELEASE_PYTHONS: true  # Enable Python 3.13 support
-        CIBW_FREE_THREADED_SUPPORT: true  # Enable free-threaded Python support
-
-    - name: Upload wheels to release
-      uses: softprops/action-gh-release@v1
-      with:
-        files: wheelhouse/*.whl
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  build-executables:
+  build:
     needs: test
     runs-on: ${{ matrix.os }}
     if: github.event_name == 'release'
@@ -156,16 +126,17 @@ jobs:
         zip -r ../${{ env.ARCHIVE_NAME }} ${{ env.EXECUTABLE_NAME }}
       shell: bash
 
-    - name: Upload executable artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: executable-${{ matrix.os }}
-        path: ${{ env.ARCHIVE_NAME }}
+    - name: Build wheels
+      run: |
+        python -m build --wheel --outdir wheelhouse
+      shell: bash
 
     - name: Upload to release
       uses: softprops/action-gh-release@v1
       with:
-        files: ${{ env.ARCHIVE_NAME }}
+        files: |
+          wheelhouse/*.whl
+          ${{ env.ARCHIVE_NAME }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
