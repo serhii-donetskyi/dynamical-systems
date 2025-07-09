@@ -200,7 +200,7 @@ class DynamicalSystemsUI {
         try {
             const argumentTypes = await this.fetchAPI(`/api/get-${componentType}-arguments/${componentName}`);
             if (argumentTypes.length === 0) {
-                this.generateStateFields();
+                await this.generateStateFields();
                 return;
             }
             argumentTypes.forEach(({name: argName, type: argType}) => {
