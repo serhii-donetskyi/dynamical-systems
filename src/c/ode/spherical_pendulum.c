@@ -5,21 +5,22 @@
 static void fn(const ode_t *restrict self, R t, const R *restrict x,
                R *restrict dxdt) {
   (void)t;
-  #define C (self->p[0])
-  #define D (self->p[1])
-  #define E (self->p[2])
-  #define F (self->p[3])
-  R tmp1 = (x[2] + (x[0] * x[0] + x[1] * x[1] + x[3] * x[3] + x[4] * x[4]) / 8.0);
+#define C (self->p[0])
+#define D (self->p[1])
+#define E (self->p[2])
+#define F (self->p[3])
+  R tmp1 =
+      (x[2] + (x[0] * x[0] + x[1] * x[1] + x[3] * x[3] + x[4] * x[4]) / 8.0);
   R tmp2 = 0.75 * (x[0] * x[4] - x[1] * x[3]);
   dxdt[0] = C * x[0] - tmp1 * x[1] - tmp2 * x[3] + 2 * x[1];
   dxdt[1] = C * x[1] + tmp1 * x[0] - tmp2 * x[4] + 2 * x[0];
   dxdt[2] = D * (x[0] * x[1] + x[3] * x[4]) + E * x[2] + F;
   dxdt[3] = C * x[3] - tmp1 * x[4] + tmp2 * x[0] + 2 * x[4];
   dxdt[4] = C * x[4] + tmp1 * x[3] + tmp2 * x[1] + 2 * x[3];
-  #undef C
-  #undef D
-  #undef E
-  #undef F
+#undef C
+#undef D
+#undef E
+#undef F
 }
 
 static result_t create(const argument_t *args);
@@ -28,12 +29,11 @@ static void destroy(ode_t *ode);
 DS_EXPORT
 ode_output_t ode_output = {
     .name = "spherical_pendulum",
-    .args = (argument_t[]){
-                           {
-                               .name = 0,
-                               .type = 0,
-                               .r = 0,
-                           }},
+    .args = (argument_t[]){{
+        .name = 0,
+        .type = 0,
+        .r = 0,
+    }},
     .malloc = malloc,
     .free = free,
     .create = create,
