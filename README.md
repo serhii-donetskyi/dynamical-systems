@@ -5,24 +5,18 @@ A high-level Python interface for numerical analysis of dynamical systems with h
 ## Features
 
 - **Fast C implementations** for numerical integration
-- **Multiple ODE solvers** (RK4, DOPRI5, etc.)
-- **Various dynamical systems** (Linear, Lorenz, Van der Pol, etc.)
+- **Multiple ODE solvers** (RK4, DOPRI5)
+- **Various dynamical systems** (Linear, Spherical Pendulum)
 - **Analysis tools** for phase portraits and system analysis
 - **Command-line interface** for quick analysis
 - **Web interface** for interactive exploration
 
 ## Installation
 
-### From PyPI (Recommended)
-
-```bash
-pip install dynamical-systems
-```
-
 ### From Source
 
 ```bash
-git clone https://github.com/yourusername/dynamical-systems.git
+git clone https://github.com/serhii-donetskyi/dynamical-systems.git
 cd dynamical-systems
 pip install -e .
 ```
@@ -30,7 +24,7 @@ pip install -e .
 ### Development Installation
 
 ```bash
-git clone https://github.com/yourusername/dynamical-systems.git
+git clone https://github.com/serhii-donetskyi/dynamical-systems.git
 cd dynamical-systems
 pip install -e ".[dev]"
 ```
@@ -46,7 +40,7 @@ pip install -e ".[dev]"
 
 ```bash
 # Generate a phase portrait for a linear system
-dynamical-systems \
+python -m dynamical_systems run \
   --ode linear \
   --ode-args n=2 \
   --ode-variables-t 0.0 \
@@ -55,7 +49,18 @@ dynamical-systems \
   --solver rk4 \
   --solver-args h_max=0.01 \
   --job portrait \
-  --job-args t_step=1.0 t_end=10.0 file=portrait.dat
+  --job-args t_step=0.1 t_end=10.0 file=portrait.dat
+
+# Or use the script entry point
+dynamical-systems run \
+  --ode spherical_pendulum \
+  --ode-variables-t 0.0 \
+  --ode-variables-x 1.0 0.0 0.0 0.0 0.0 \
+  --ode-parameters 0.1 0.2 0.3 0.4 \
+  --solver dopri5 \
+  --solver-args h_max=0.1 eps=1e-6 \
+  --job portrait \
+  --job-args t_step=0.05 t_end=20.0 file=pendulum.dat
 ```
 
 ### Python API
@@ -76,7 +81,7 @@ job_factory = components['job']['portrait']
 # Create instances
 ode = ode_factory.create(n=2).set_t(0.0).set_x([0.0, 1.0]).set_p([0, 1, -1, 0])
 solver = solver_factory.create(h_max=0.01)
-job = job_factory.create(t_end=10.0, file='portrait.dat')
+job = job_factory.create(t_step=0.1, t_end=10.0, file='portrait.dat')
 
 # Run simulation
 job.run(ode, solver)
@@ -85,26 +90,55 @@ job.run(ode, solver)
 ### Web Interface
 
 ```bash
-# Start the web interface
-python ui/app.py
+# Start the web interface (opens browser automatically)
+python -m dynamical_systems ui
+
+# Or specify port and debug mode
+python -m dynamical_systems ui --port 8080 --debug
+
+# Default behavior when no arguments (perfect for executables)
+python -m dynamical_systems
+# or
+dynamical-systems
 ```
 
-Then open your browser to `http://localhost:5001`
+The web interface will automatically open at `http://localhost:5001` (or your specified port).
 
 ## Available Components
 
 ### ODEs
-- `linear`: Linear dynamical systems
-- More systems available in the `src/ode/` directory
+
+#### `linear`
+Linear dynamical systems of the form dx/dt = Ax
+- **Parameters**: `n` (integer) - dimension of the system (1-100)
+- **State variables**: `n` variables
+- **Parameters**: `n×n` matrix elements (row-major order)
+
+#### `spherical_pendulum`
+5-dimensional spherical pendulum dynamics
+- **State variables**: 5 variables (position and momentum coordinates)
+- **Parameters**: 4 parameters (C, D, E, F coefficients)
 
 ### Solvers
-- `rk4`: 4th-order Runge-Kutta
-- `dopri5`: Dormand-Prince 5th-order adaptive solver
-- More solvers available in the `src/solver/` directory
+
+#### `rk4`
+4th-order Runge-Kutta method (fixed step size)
+- **Parameters**: `h_max` (float) - maximum step size (0 < h_max < 0.5)
+
+#### `dopri5`
+Dormand-Prince 5th-order adaptive method
+- **Parameters**: 
+  - `h_max` (float) - maximum step size (0 < h_max < 1)
+  - `eps` (float) - error tolerance (0 < eps < 1)
 
 ### Jobs
-- `portrait`: Generate phase portraits
-- More analysis tools available in the `src/job/` directory
+
+#### `portrait`
+Generate phase portraits by integrating the system over time
+- **Parameters**:
+  - `t_step` (float) - output time step
+  - `t_end` (float) - end time for integration
+  - `file` (string) - output file path (default: "portrait.dat")
 
 ## Development
 
@@ -113,7 +147,7 @@ Then open your browser to `http://localhost:5001`
 The package uses C extensions for performance. To build:
 
 ```bash
-python setup.py build_ext --inplace
+python -m build
 ```
 
 ### Running Tests
@@ -122,11 +156,19 @@ python setup.py build_ext --inplace
 pytest
 ```
 
-### Code Style
+### Project Structure
 
-```bash
-black .
-flake8 .
+```
+dynamical-systems/
+├── src/
+│   ├── c/                      # C implementation
+│   │   ├── ode/               # ODE implementations
+│   │   ├── solver/            # Solver implementations
+│   │   └── job/               # Analysis job implementations
+│   └── python/                # Python interface
+│       └── ui/                # Web interface
+├── tests/                     # Test suite
+└── dist/                      # Built wheels
 ```
 
 ## License
