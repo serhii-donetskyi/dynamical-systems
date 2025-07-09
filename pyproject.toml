@@ -44,6 +44,7 @@ Issues = "https://github.com/serhii-donetskyi/dynamical-systems/issues"
 [tool.setuptools_scm]
 write_to = "src/python/_version.py"
 local_scheme = "no-local-version"
+fallback_version = "0.1.0"
 
 [tool.setuptools]
 packages = ["dynamical_systems"]
