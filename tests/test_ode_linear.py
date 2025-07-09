@@ -25,6 +25,8 @@ def test_ode(ode_factory):
 def test_errors(ode_factory):
     with pytest.raises(Exception):
         ode_factory.create(n=-1)
+    with pytest.raises(Exception):
+        ode_factory.create(n=2, m=3)
     ode = ode_factory.create(n=2)
     with pytest.raises(Exception):
         ode.set_t("0")

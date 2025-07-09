@@ -49,10 +49,14 @@ static result_t job(ode_t *restrict ode, solver_t *restrict solver,
     result.message = "t_step must be positive";
     return result;
   }
-
-  if (t_end < ode->t) {
+  if (t_end <= ode->t) {
     result.type = FAILURE;
-    result.message = "t_end must be greater than ODE's t";
+    result.message = "t_end must be greater than ODE.t";
+    return result;
+  }
+  if (t_step > (t_end - ode->t)) {
+    result.type = FAILURE;
+    result.message = "t_step cannot be greater than (t_end - ODE.t)";
     return result;
   }
 

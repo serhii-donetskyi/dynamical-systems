@@ -26,12 +26,21 @@ argument_t *py_copy_and_parse_args(PyObject *args, PyObject *kwargs,
   I arg_size = 0;
   while (args_in[arg_size].name)
     arg_size++;
+
+  Py_ssize_t nargs = PyTuple_GET_SIZE(args);
+  Py_ssize_t nkwargs = PyDict_Size(kwargs);
+  
+  if (nargs + nkwargs != arg_size) {
+    PyErr_Format(PyExc_TypeError, "Expected %d arguments, got %d positional and %d keyword",
+                 arg_size, nargs, nkwargs);
+    return NULL;
+  }
+
   argument_t *args_out = PyMem_Malloc(sizeof(argument_t) * (arg_size + 1));
   if (!args_out)
     return NULL;
   memcpy(args_out, args_in, sizeof(argument_t) * (arg_size + 1));
 
-  Py_ssize_t nargs = PyTuple_GET_SIZE(args);
   for (Py_ssize_t i = 0; args_out[i].name; i++) {
 
     PyObject *value = NULL;
