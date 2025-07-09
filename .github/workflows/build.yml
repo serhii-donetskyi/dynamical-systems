@@ -92,11 +92,12 @@ jobs:
         CIBW_PRERELEASE_PYTHONS: true  # Enable Python 3.13 support
         CIBW_FREE_THREADED_SUPPORT: true  # Enable free-threaded Python support
 
-    - name: Upload wheels
-      uses: actions/upload-artifact@v4
+    - name: Upload wheels to release
+      uses: softprops/action-gh-release@v1
       with:
-        name: wheels-${{ matrix.os }}
-        path: wheelhouse/*.whl
+        files: wheelhouse/*.whl
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build-executables:
     needs: test
