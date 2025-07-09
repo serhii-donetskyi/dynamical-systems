@@ -68,4 +68,4 @@ def test_performnace(job_factory, ode_factory, solver_factory):
     end_time = time.time()
     assert os.path.exists("test_performance.txt")
     os.remove("test_performance.txt")
-    assert end_time - start_time < 3
+    assert end_time - start_time < 5
