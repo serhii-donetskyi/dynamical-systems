@@ -61,7 +61,6 @@ def get_linker_args():
             "/OPT:REF",  # Remove unreferenced functions and data
             "/OPT:ICF",  # Enable identical COMDAT folding
             "/OPT:LBR",  # Optimize for long branches (better code layout)
-            "/OPT:NOWIN98",  # Don't optimize for Windows 98 compatibility
             "/INCREMENTAL:NO",  # Disable incremental linking for better optimization
         ]
     else:
