@@ -24,3 +24,7 @@ _version.py
 .pytest_cache*
 htmlcov*
 .coverage
+
+# calculations
+*.csv
+*.txt
