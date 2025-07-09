@@ -91,7 +91,6 @@ jobs:
         CIBW_ARCHS_WINDOWS: "AMD64"
         CIBW_PRERELEASE_PYTHONS: true  # Enable Python 3.13 support
         CIBW_FREE_THREADED_SUPPORT: true  # Enable free-threaded Python support
-        CIBW_BUILD_VERBOSITY: 3  # Increase build verbosity for debugging
 
     - name: Upload wheels
       uses: actions/upload-artifact@v4
