@@ -170,7 +170,6 @@ class DynamicalSystemsUI {
                 this.components.ode.arguments.apply.disabled = true;
                 this.fieldValidations.ode.variables = {t: false};
                 this.fieldValidations.ode.parameters = {};
-                this.componentConfigs.ode[componentName] = {variables: {}, parameters: {}};
             }
             section.style.display = 'none'; // Hide the section
             this.selectedComponents[componentType] = null;
@@ -187,15 +186,8 @@ class DynamicalSystemsUI {
             }
         }
         section.style.display = 'block'; // Show the section
-        const fields = this.components[componentType].arguments.fields;
-        const id = fields.id;
-        fields.innerHTML = '';
-
         this.selectedComponents[componentType] = componentName;
-        this.fieldValidations[componentType].args = {};
-
-        const argValues = this.componentConfigs[componentType][componentName].args;
-        const argValidations = this.fieldValidations[componentType].args;
+        this.components[componentType].arguments.fields.innerHTML = '';
 
         try {
             const argumentTypes = await this.fetchAPI(`/api/get-${componentType}-arguments/${componentName}`);
@@ -204,55 +196,65 @@ class DynamicalSystemsUI {
                 return;
             }
             argumentTypes.forEach(({name: argName, type: argType}) => {
-                const fieldDiv = document.createElement('div');
-                fieldDiv.className = 'argument-field';
-
-                const label = document.createElement('label');
-                label.textContent = argName;
-                label.setAttribute('for', `${id}-${argName}`);
-
-                const input = document.createElement('input');
-                input.type = 'text';
-                input.className = 'argument-input';
-                input.id = `${id}-${argName}`;
-                input.name = `${id}-${argName}`;
-                if (!argValues[argName]) {
-                    argValues[argName] = ''
-                }
-                input.addEventListener('input', (e) => {
-                    argValues[argName] = e.target.value;
-                    argValidations[argName] = this.isValidField(e.target.value, argType);
-                    if (argValidations[argName]) {
-                        input.classList.remove('invalid');
-                    } else {
-                        input.classList.add('invalid');
-                    }
-                    if (componentType === 'ode') {
-                        const hasInvalidArgs = Object.values(argValidations).some(arg => !arg);
-                        this.components.ode.state.section.style.display = 'none';
-                        this.components.ode.arguments.apply.disabled = hasInvalidArgs;
-                        this.fieldValidations.ode.variables = {t: false};
-                        this.fieldValidations.ode.parameters = {};
-                    } else {
-                        this.checkIfRunReady();
-                    }
-                });
-
-                input.value = argValues[argName];
-                input.dispatchEvent(new Event('input', { bubbles: true })); // Trigger input event to update UI
-
-                const typeInfo = document.createElement('div');
-                typeInfo.className = 'argument-type';
-                typeInfo.textContent = `Type: ${argType}`;
-
-                fieldDiv.appendChild(label);
-                fieldDiv.appendChild(input);
-                fieldDiv.appendChild(typeInfo);
-                fields.appendChild(fieldDiv);
+                this.createArgumentField(componentType, argName, argType);
             });
         } catch (error) {
             this.createPopUp(`Error loading ${componentType} arguments: ${error}`, false);
         }
+    }
+
+    async createArgumentField(componentType, argName, argType) {
+        const argValues = this.componentConfigs[componentType][this.selectedComponents[componentType]].args;
+        const argValidations = this.fieldValidations[componentType].args;
+
+        const fields = this.components[componentType].arguments.fields;
+        const id = fields.id;
+
+        const fieldDiv = document.createElement('div');
+        fieldDiv.className = 'argument-field';
+
+        const label = document.createElement('label');
+        label.textContent = argName;
+        label.setAttribute('for', `${id}-${argName}`);
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'argument-input';
+        input.id = `${id}-${argName}`;
+        input.name = `${id}-${argName}`;
+        if (!argValues[argName]) {
+            argValues[argName] = ''
+        }
+        input.addEventListener('input', (e) => {
+            argValues[argName] = e.target.value;
+            argValidations[argName] = this.isValidField(e.target.value, argType);
+            if (argValidations[argName]) {
+                input.classList.remove('invalid');
+            } else {
+                input.classList.add('invalid');
+            }
+            if (componentType === 'ode') {
+                const hasInvalidArgs = Object.values(argValidations).some(arg => !arg);
+                this.components.ode.state.section.style.display = 'none';
+                this.components.ode.arguments.apply.disabled = hasInvalidArgs;
+                this.fieldValidations.ode.variables = {t: false};
+                this.fieldValidations.ode.parameters = {};
+            } else {
+                this.checkIfRunReady();
+            }
+        });
+
+        input.value = argValues[argName];
+        input.dispatchEvent(new Event('input', { bubbles: true })); // Trigger input event to update UI
+
+        const typeInfo = document.createElement('div');
+        typeInfo.className = 'argument-type';
+        typeInfo.textContent = `Type: ${argType}`;
+
+        fieldDiv.appendChild(label);
+        fieldDiv.appendChild(input);
+        fieldDiv.appendChild(typeInfo);
+        fields.appendChild(fieldDiv);
     }
 
     async generateStateFields(){
