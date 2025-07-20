@@ -1,3 +1,5 @@
+import * as THREE from './three.module.js';
+
 class DynamicalSystemsUI {
     constructor() {
         this.selectedComponents = {
@@ -674,7 +676,363 @@ class DynamicalSystemsUI {
     }
 }
 
+class Plot3D {
+    constructor(containerId) {
+        this.container = document.getElementById(containerId);
+        this.scene = new THREE.Scene();
+        this.scene.background = new THREE.Color(0xffffff);
+
+        this.camera = new THREE.PerspectiveCamera(75, this.container.clientWidth / this.container.clientHeight, 0.1, 1000);
+        this.renderer = new THREE.WebGLRenderer({
+            canvas: document.getElementById('canvas'),
+            antialias: true
+        });
+
+        this.renderer.setSize(1080, 720, false);  // false means don't update style
+        this.renderer.setClearColor(0xffffff);
+
+        // Set camera position
+        this.camera.position.set(5, 5, 5);
+        this.camera.lookAtPosition = new THREE.Vector3(0, 0, 0);
+        this.camera.lookAt(this.camera.lookAtPosition);
+
+        // Add orbit controls (mouse interaction)
+        this.setupControls();
+
+        // Handle window resize
+        window.addEventListener('resize', () => this.onWindowResize());
+
+        this.animate();
+    }
+
+    setupControls() {
+        // Basic mouse controls for camera rotation
+        let isMouseDown = false;
+        let mouseX = 0, mouseY = 0;
+
+        this.renderer.domElement.addEventListener('mousedown', (e) => {
+            isMouseDown = true;
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+        });
+
+        this.renderer.domElement.addEventListener('mouseup', () => {
+            isMouseDown = false;
+        });
+
+        this.renderer.domElement.addEventListener('mousemove', (e) => {
+            if (!isMouseDown) return;
+
+            const deltaX = e.clientX - mouseX;
+            const deltaY = e.clientY - mouseY;
+
+            const spherical = new THREE.Spherical();
+            spherical.setFromVector3(this.camera.position.clone().sub(this.camera.lookAtPosition));
+            spherical.theta -= deltaX * 0.01;
+            spherical.phi += deltaY * 0.01;
+            spherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1, spherical.phi));
+
+            this.camera.position.setFromSpherical(spherical).add(this.camera.lookAtPosition);
+            this.camera.lookAt(this.camera.lookAtPosition);
+            console.log(this.camera.position.length());
+            console.log(this.camera.position.clone().sub(this.camera.lookAtPosition).length());
+
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+        });
+
+        // Zoom with mouse wheel
+        this.renderer.domElement.addEventListener('wheel', (e) => {
+            const scale = e.deltaY > 0 ? 1.1 : 0.9;
+            this.camera.position.sub(this.camera.lookAtPosition).multiplyScalar(scale).add(this.camera.lookAtPosition);
+            this.updateTicks(); // Update ticks when zooming
+        });
+    }
+
+    plotTrajectory(points) {
+        // Clear previous plots
+        const existingLine = this.scene.getObjectByName('trajectory');
+        if (existingLine) this.scene.remove(existingLine);
+
+        // Create trajectory line
+        const geometry = new THREE.BufferGeometry();
+        const positions = new Float32Array(points.length * 3);
+        let maxX = points[0][0];
+        let minX = points[0][0];
+        let minY = points[0][1];
+        let maxY = points[0][1];
+        let minZ = points[0][2] || 0;
+        let maxZ = points[0][2] || 0;
+
+        for (let i = 0; i < points.length; i++) {
+            const x = points[i][0];
+            const y = points[i][1];
+            const z = points[i][2] || 0; // Default z=0 for 2D systems
+            positions[i * 3] = x;
+            positions[i * 3 + 1] = y;
+            positions[i * 3 + 2] = z;
+            maxX = Math.max(maxX, x);
+            minX = Math.min(minX, x);
+            maxY = Math.max(maxY, y);
+            minY = Math.min(minY, y);
+            maxZ = Math.max(maxZ, z);
+            minZ = Math.min(minZ, z);
+        }
+
+        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+        const material = new THREE.LineBasicMaterial({ color: 0x0066cc, linewidth: 2 });
+        const line = new THREE.Line(geometry, material);
+        line.name = 'trajectory';
+
+        this.scene.add(line);
+        this.camera.lookAtPosition = new THREE.Vector3((maxX + minX) / 2, (maxY + minY) / 2, (maxZ + minZ) / 2);
+        this.camera.lookAt(this.camera.lookAtPosition);
+
+        // Add coordinate axes
+        this.addAxes();
+    }
+
+    addAxes() {
+        // Remove existing axes, ticks, and grid
+        const existingAxes = this.scene.getObjectByName('axes');
+        if (existingAxes) this.scene.remove(existingAxes);
+        const existingTicks = this.scene.getObjectByName('ticks');
+        if (existingTicks) this.scene.remove(existingTicks);
+        const existingGrid = this.scene.getObjectByName('grid');
+        if (existingGrid) this.scene.remove(existingGrid);
+
+        const axesGroup = new THREE.Group();
+        axesGroup.name = 'axes';
+
+        // Fixed axis length
+        const axisLength = 10;
+
+        // Create grid planes
+        const gridGroup = new THREE.Group();
+        gridGroup.name = 'grid';
+
+        // Helper function to create a grid plane
+        const createGridPlane = (normal, color) => {
+            const gridGeometry = new THREE.BufferGeometry();
+            const gridLines = [];
+            const step = 1; // 1 unit between grid lines
+            const range = axisLength;
+
+            // Create grid lines
+            for (let i = -range; i <= range; i += step) {
+                if (normal === 'xy') {
+                    // Lines parallel to x-axis
+                    gridLines.push(new THREE.Vector3(-range, i, 0));
+                    gridLines.push(new THREE.Vector3(range, i, 0));
+                    // Lines parallel to y-axis
+                    gridLines.push(new THREE.Vector3(i, -range, 0));
+                    gridLines.push(new THREE.Vector3(i, range, 0));
+                } else if (normal === 'xz') {
+                    // Lines parallel to x-axis
+                    gridLines.push(new THREE.Vector3(-range, 0, i));
+                    gridLines.push(new THREE.Vector3(range, 0, i));
+                    // Lines parallel to z-axis
+                    gridLines.push(new THREE.Vector3(i, 0, -range));
+                    gridLines.push(new THREE.Vector3(i, 0, range));
+                } else if (normal === 'yz') {
+                    // Lines parallel to y-axis
+                    gridLines.push(new THREE.Vector3(0, -range, i));
+                    gridLines.push(new THREE.Vector3(0, range, i));
+                    // Lines parallel to z-axis
+                    gridLines.push(new THREE.Vector3(0, i, -range));
+                    gridLines.push(new THREE.Vector3(0, i, range));
+                }
+            }
+
+            gridGeometry.setFromPoints(gridLines);
+            const gridMaterial = new THREE.LineBasicMaterial({
+                color: color,
+                opacity: 0.1,
+                transparent: true
+            });
+            return new THREE.LineSegments(gridGeometry, gridMaterial);
+        };
+
+        // Add grid planes
+        gridGroup.add(createGridPlane('xy', 0x666666)); // XY plane
+        gridGroup.add(createGridPlane('xz', 0x666666)); // XZ plane
+        gridGroup.add(createGridPlane('yz', 0x666666)); // YZ plane
+
+        // X axis (black)
+        const xGeometry = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(-axisLength, 0, 0), new THREE.Vector3(axisLength, 0, 0)
+        ]);
+        const xMaterial = new THREE.LineBasicMaterial({ color: 0x000000 });
+        axesGroup.add(new THREE.Line(xGeometry, xMaterial));
+
+        // Y axis (black)
+        const yGeometry = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(0, -axisLength, 0), new THREE.Vector3(0, axisLength, 0)
+        ]);
+        const yMaterial = new THREE.LineBasicMaterial({ color: 0x000000 });
+        axesGroup.add(new THREE.Line(yGeometry, yMaterial));
+
+        // Z axis (black)
+        const zGeometry = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(0, 0, -axisLength), new THREE.Vector3(0, 0, axisLength)
+        ]);
+        const zMaterial = new THREE.LineBasicMaterial({ color: 0x000000 });
+        axesGroup.add(new THREE.Line(zGeometry, zMaterial));
+
+        this.scene.add(gridGroup);
+        this.scene.add(axesGroup);
+
+        // Add dynamic ticks
+        this.updateTicks();
+    }
+
+    updateTicks() {
+        // Remove existing ticks
+        const existingTicks = this.scene.getObjectByName('ticks');
+        if (existingTicks) this.scene.remove(existingTicks);
+
+        const ticksGroup = new THREE.Group();
+        ticksGroup.name = 'ticks';
+
+        // Calculate base scale from camera distance
+        const cameraDistance = this.camera.position.length();
+        const orderOfMagnitude = Math.floor(Math.log10(cameraDistance));
+        const baseTickStep = Math.pow(10, orderOfMagnitude - 1);
+        const tickSize = baseTickStep * 0.2;
+
+        // Calculate viewport size at the axes plane
+        const vFOV = this.camera.fov * Math.PI / 180;
+        const planeDistance = this.camera.position.length();
+        const viewHeight = 2 * Math.tan(vFOV / 2) * planeDistance;
+        const viewWidth = viewHeight * this.camera.aspect;
+
+        // Calculate minimum space between ticks (in world units)
+        const minTickSpacing = viewWidth / 15; // Aim for about 15 ticks across view
+
+        // Helper function to create tick line
+        const createTick = (value, axis) => {
+            let start, end;
+            if (axis === 'x') {
+                start = new THREE.Vector3(value, 0, 0);
+                end = new THREE.Vector3(value, -tickSize, 0);
+            } else if (axis === 'y') {
+                start = new THREE.Vector3(0, value, 0);
+                end = new THREE.Vector3(tickSize, value, 0);
+            } else {
+                start = new THREE.Vector3(0, 0, value);
+                end = new THREE.Vector3(tickSize, 0, value);
+            }
+
+            const geometry = new THREE.BufferGeometry().setFromPoints([start, end]);
+            const material = new THREE.LineBasicMaterial({ color: 0x000000 });
+            const tick = new THREE.Line(geometry, material);
+
+            // Add tick label with higher resolution
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.width = 256; // 4x resolution
+            canvas.height = 128;
+            context.fillStyle = '#000000';
+            context.font = '72px Arial'; // Increased font size for higher resolution
+            context.textAlign = 'center';
+            context.textBaseline = 'middle';
+
+            // Format number based on magnitude
+            let label;
+            if (Math.abs(value) >= 1000 || Math.abs(value) <= 0.001) {
+                label = value.toExponential(1);
+            } else {
+                label = value.toPrecision(3);
+            }
+            context.fillText(label, canvas.width/2, canvas.height/2);
+
+            const texture = new THREE.CanvasTexture(canvas);
+            const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
+            const sprite = new THREE.Sprite(spriteMaterial);
+
+            // Position label based on axis
+            const labelOffset = tickSize * 2;
+            if (axis === 'x') {
+                sprite.position.set(value, -labelOffset, 0);
+            } else if (axis === 'y') {
+                sprite.position.set(labelOffset, value, 0);
+            } else {
+                sprite.position.set(labelOffset, 0, value);
+            }
+
+            // Scale sprite based on view distance
+            const spriteScale = planeDistance * 0.1;
+            sprite.scale.set(spriteScale, spriteScale * 0.5, 1);
+
+            ticksGroup.add(tick);
+            ticksGroup.add(sprite);
+        };
+
+        // Generate tick values based on order of magnitude
+        const tickValues = [];
+        const range = Math.max(Math.abs(viewWidth), Math.abs(viewHeight)) / 2;
+        const step = Math.pow(10, Math.floor(Math.log10(minTickSpacing)));
+
+        // Generate main divisions
+        for (let i = -Math.ceil(range/step); i <= Math.ceil(range/step); i++) {
+            const value = i * step;
+            if (Math.abs(value) > 1e-10) { // Skip very small values near zero
+                tickValues.push(value);
+            }
+        }
+
+        // Add intermediate ticks if space allows
+        if (step >= minTickSpacing * 2) {
+            for (let i = -Math.ceil(range/step); i <= Math.ceil(range/step); i++) {
+                const value = (i + 0.5) * step;
+                if (Math.abs(value) > 1e-10) {
+                    tickValues.push(value);
+                }
+            }
+        }
+
+        // Sort values
+        tickValues.sort((a, b) => a - b);
+
+        // Create ticks for each axis
+        tickValues.forEach(value => {
+            createTick(value, 'x');
+            createTick(value, 'y');
+            createTick(value, 'z');
+        });
+
+        this.scene.add(ticksGroup);
+    }
+
+    onWindowResize() {
+        this.camera.aspect = this.container.clientWidth / this.container.clientHeight;
+        this.camera.updateProjectionMatrix();
+        this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
+        this.updateTicks(); // Update ticks when window resizes
+    }
+
+    animate() {
+        requestAnimationFrame(() => this.animate());
+        this.renderer.render(this.scene, this.camera);
+    }
+}
+
 // Initialize the application when the DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    new DynamicalSystemsUI();
+    const ui = new DynamicalSystemsUI();
+
+    // Initialize 3D plot
+    ui.plot3D = new Plot3D('plot-container');
+
+    // Example: Plot a simple 3D spiral for demonstration
+    const examplePoints = [];
+    for (let t = 0; t < 20; t += 0.1) {
+        examplePoints.push([
+            Math.cos(t) * (1 + t * 0.1),
+            Math.sin(t) * (1 + t * 0.1),
+            t * 0.2
+        ]);
+    }
+    ui.plot3D.plotTrajectory(examplePoints);
 });
