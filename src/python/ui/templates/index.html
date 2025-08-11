@@ -91,6 +91,11 @@
                     </div>
                 </div>
 
+                <!-- Results Section -->
+                <div id="plot-container">
+                    <canvas id="canvas"></canvas>
+                </div>
+
                 <!-- Action Buttons -->
                 <div id="action-section" class="action-section">
                     <button id="action-section-run-btn" class="btn btn-primary" disabled>Run Job</button>
@@ -102,6 +107,6 @@
         </main>
     </div>
 
-    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>
 </html>

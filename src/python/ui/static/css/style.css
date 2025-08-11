@@ -67,6 +67,28 @@ main {
     padding-bottom: 10px;
 }
 
+/* 3D Plot Container */
+#plot-container {
+    width: 100%;
+    max-width: 1080px;
+    aspect-ratio: 1080/720;
+    margin: 30px auto;  /* centered with auto margins */
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #f8f9fa;
+    position: relative;
+}
+
+#canvas {
+    width: 100% !important;
+    height: 100% !important;
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
 /* Form elements */
 .dropdown-section {
     margin-bottom: 25px;
