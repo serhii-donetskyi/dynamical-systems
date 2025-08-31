@@ -745,13 +745,6 @@ class Plot3D {
             mouseX = e.clientX;
             mouseY = e.clientY;
         });
-
-        // Zoom with mouse wheel
-        // this.renderer.domElement.addEventListener('wheel', (e) => {
-        //     this.scene.scale.multiplyScalar(e.deltaY > 0 ? 1.1 : 0.9);
-        //     this.scene.position.multiplyScalar(e.deltaY > 0 ? 1.1 : 0.9);
-        //     // this.updateTicks(); // Update ticks when zooming
-        // });
     }
 
     plotTrajectory(points) {
@@ -783,12 +776,15 @@ class Plot3D {
             maxZ = Math.max(maxZ, z);
             minZ = Math.min(minZ, z);
         }
-        this.scene.maxX = maxX;
-        this.scene.minX = minX;
-        this.scene.maxY = maxY;
-        this.scene.minY = minY;
-        this.scene.maxZ = maxZ;
-        this.scene.minZ = minZ;
+        const zMargin = (maxZ - minZ) * 0.001;
+        const xMargin = (maxX - minX) * 0.001;
+        const yMargin = (maxY - minY) * 0.001;
+        this.scene.maxX = maxX + xMargin;
+        this.scene.minX = minX - xMargin;
+        this.scene.maxY = maxY + yMargin;
+        this.scene.minY = minY - yMargin;
+        this.scene.maxZ = maxZ + zMargin;
+        this.scene.minZ = minZ - zMargin;
 
         // Calculate viewport size at the axes plane
         const visibleWidth = this.camera.right - this.camera.left;
@@ -823,23 +819,6 @@ class Plot3D {
         if (existingTicks) this.scene.remove(existingTicks);
         const existingGrid = this.scene.getObjectByName('grid');
         if (existingGrid) this.scene.remove(existingGrid);
-
-        const getTicksIntervals = (minValue, maxValue) => {
-            const range = maxValue - minValue;
-            let step = Math.pow(10, Math.floor(Math.log10(range)));
-
-            if (range / step >= 5) step /= 1;
-            else if (range / (step / 2) >= 5) step /= 2;
-            else step /= 5;
-
-            const firstTick = Math.floor(minValue / step) * step;
-            const ticks = [];
-            for (let i = firstTick; i <= maxValue; i += step) {
-                ticks.push(i);
-            }
-
-            return ticks;
-        }
 
         // Axes group
         const axesGroup = new THREE.Group();
@@ -878,31 +857,27 @@ class Plot3D {
         axesGroup.add(new THREE.LineSegments(axesGeometry, axesMaterial));
 
         // Ticks group
-        const ticksGroup = new THREE.Group();
-        ticksGroup.name = 'ticks';
-        this.scene.add(ticksGroup);
-        const createTick = (tickValue, tickSize, axis) => {
-            let tickGeometry;
-            if (axis === 'z') {
-                tickGeometry = new THREE.BufferGeometry().setFromPoints([
-                    new THREE.Vector3(frontX, frontY, tickValue),
-                    new THREE.Vector3(frontX + tickSize, frontY, tickValue)
-                ]);
-            } else if (axis === 'x') {
-                tickGeometry = new THREE.BufferGeometry().setFromPoints([
-                    new THREE.Vector3(tickValue, frontY, frontZ),
-                    new THREE.Vector3(tickValue, frontY, frontZ + tickSize)
-                ]);
-            } else {
-                tickGeometry = new THREE.BufferGeometry().setFromPoints([
-                    new THREE.Vector3(backX, tickValue, frontZ),
-                    new THREE.Vector3(backX - tickSize, tickValue, frontZ)
-                ]);
-            }
-            const tickMaterial = new THREE.LineBasicMaterial({ color: 0x000000 });
-            const tick = new THREE.Line(tickGeometry, tickMaterial);
+        const getTicksIntervalues = (minValue, maxValue) => {
+            const tickCount = 3;
+            const range = maxValue - minValue;
+            let step = Math.pow(10, Math.floor(Math.log10(range)));
 
-            // Add tick label with higher resolution
+            if (range / step >= tickCount) step /= 1;
+            else if (range / (step / 2) >= tickCount) step /= 2;
+            else step /= 5;
+
+            let precision = Math.floor(Math.log10(step));
+            if (precision < 0) precision*= -1;
+            else precision = 0;
+            const firstIndex = Math.ceil(minValue / step);
+            const lastIndex = Math.floor(maxValue / step);
+            const ticks = [];
+            for (let i = firstIndex; i <= lastIndex; i++) {
+                i === 0 ? ticks.push('0') : ticks.push((i * step).toFixed(precision));
+            }
+            return ticks;
+        }
+        const createTickSprite = (value) => {
             const canvas = document.createElement('canvas');
             const context = canvas.getContext('2d');
             canvas.width = 512; // 4x resolution
@@ -913,50 +888,50 @@ class Plot3D {
             context.textBaseline = 'middle';
 
             // Format number based on magnitude
-            let label;
-            if (Math.abs(tickValue) >= 1000 || Math.abs(tickValue) <= 0.001) {
-                label = tickValue.toExponential(1);
-            } else {
-                label = tickValue.toPrecision(2);
-            }
-            context.fillText(label, canvas.width/2, canvas.height/2);
+            context.fillText(value, canvas.width/2, canvas.height/2);
 
             const texture = new THREE.CanvasTexture(canvas);
             const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
-            const sprite = new THREE.Sprite(spriteMaterial);
+            return new THREE.Sprite(spriteMaterial);
+        };
 
-            const labelOffset = tickSize * 0.2; // Increased offset for better visibility
-            if (axis === 'z') {
-                sprite.position.set(frontX, frontY, tickValue - labelOffset);
-            } else if (axis === 'x') {
-                sprite.position.set(tickValue, frontY, frontZ + labelOffset);
-            } else {
-                sprite.position.set(backX - labelOffset, tickValue, frontZ);
-            }
+        const ticksGroup = new THREE.Group();
+        ticksGroup.name = 'ticks';
+        this.scene.add(ticksGroup);
 
-            // add tick and label to group
-            ticksGroup.add(tick);
+        const xTicks = getTicksIntervalues(this.scene.minX, this.scene.maxX);
+        const yTicks = getTicksIntervalues(this.scene.minY, this.scene.maxY);
+        const zTicks = getTicksIntervalues(this.scene.minZ, this.scene.maxZ);
+
+        const xTickSize = (frontX > 0 ? 1 : -1) * (this.scene.maxX - this.scene.minX) * 0.05;
+        const zTickSize = (frontZ > 0 ? 1 : -1) * (this.scene.maxZ - this.scene.minZ) * 0.05;
+
+        const ticksGeometry = new THREE.BufferGeometry();
+        const ticksLines = [];
+        zTicks.forEach(value => {
+            ticksLines.push(new THREE.Vector3(frontX, frontY, value));
+            ticksLines.push(new THREE.Vector3(frontX + xTickSize, frontY, value));
+            const sprite = createTickSprite(value);
+            sprite.position.set(frontX + 2 * xTickSize, frontY, value);
             ticksGroup.add(sprite);
-        }
-
-        const xTicks = getTicksIntervals(this.scene.minX, this.scene.maxX);
-        const xTickSize = (xTicks[1] - xTicks[0]) * 0.2;
-        xTicks.forEach(tick => {
-            createTick(tick, xTickSize, 'x');
         });
-
-        const yTicks = getTicksIntervals(this.scene.minY, this.scene.maxY);
-        const yTickSize = (yTicks[1] - yTicks[0]) * 0.2;
-        yTicks.forEach(tick => {
-            createTick(tick, yTickSize, 'y');
+        xTicks.forEach(value => {
+            ticksLines.push(new THREE.Vector3(value, frontY, frontZ));
+            ticksLines.push(new THREE.Vector3(value, frontY, frontZ + zTickSize));
+            const sprite = createTickSprite(value);
+            sprite.position.set(value, frontY, frontZ + 2 * zTickSize);
+            ticksGroup.add(sprite);
         });
-
-        const zTicks = getTicksIntervals(this.scene.minZ, this.scene.maxZ);
-        const zTickSize = (zTicks[1] - zTicks[0]) * 0.2;
-        zTicks.forEach(tick => {
-            createTick(tick, zTickSize, 'z');
+        yTicks.forEach(value => {
+            ticksLines.push(new THREE.Vector3(backX, value, frontZ));
+            ticksLines.push(new THREE.Vector3(backX - xTickSize, value, frontZ));
+            const sprite = createTickSprite(value);
+            sprite.position.set(backX - 2 * xTickSize, value, frontZ);
+            ticksGroup.add(sprite);
         });
-
+        ticksGeometry.setFromPoints(ticksLines);
+        const tickMaterial = new THREE.LineBasicMaterial({ color: 0x000000 });
+        ticksGroup.add(new THREE.LineSegments(ticksGeometry, tickMaterial));
 
         // Create grid planes
         const gridGroup = new THREE.Group();
