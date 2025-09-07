@@ -118,10 +118,10 @@ pub fn RK4(comptime vector_size: u64) type {
         }
 
         fn integrate(
-            noalias self: *Solver,
-            noalias ode: *const ODE,
-            noalias t: *f64,
-            noalias x: [*]T,
+            self: *Solver,
+            ode: *const ODE,
+            t: *f64,
+            x: [*]T,
             t_end: f64,
         ) !void {
             const data: *Data = @ptrCast(@alignCast(self.data));

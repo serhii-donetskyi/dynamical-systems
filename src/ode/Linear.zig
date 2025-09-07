@@ -64,7 +64,7 @@ pub fn Linear(comptime v_size: u64) type {
             self.allocator.free(self.args);
         }
 
-        fn calc(noalias self: *const ODE, t: f64, noalias x: [*]const T, noalias dxdt: [*]T) void {
+        fn calc(self: *const ODE, t: f64, x: [*]const T, dxdt: [*]T) void {
             _ = t;
             if (comptime vector_size == 0) {
                 for (0..self.x_dim) |i| {

@@ -22,13 +22,13 @@ pub fn ODE(comptime v_size: u64) type {
 
         pub const VTable = struct {
             destroy: *const fn (Self) void,
-            calc: *const fn (noalias *const Self, f64, noalias [*]const T, noalias [*]T) void,
+            calc: *const fn (*const Self, f64, [*]const T, [*]T) void,
         };
 
         pub inline fn destroy(self: Self) void {
             self.vtable.destroy(self);
         }
-        pub inline fn calc(noalias self: *const Self, t: f64, noalias x: [*]const T, noalias dxdt: [*]T) void {
+        pub inline fn calc(self: *const Self, t: f64, x: [*]const T, dxdt: [*]T) void {
             self.vtable.calc(self, t, x, dxdt);
         }
         pub inline fn get_x_len(self: Self) u64 {

@@ -21,10 +21,10 @@ pub fn Solver(comptime vector_size: u64) type {
         const VTable = struct {
             destroy: *const fn (Self) void,
             integrate: *const fn (
-                noalias *Self,
-                noalias *const ODE,
-                noalias *f64,
-                noalias [*]T,
+                *Self,
+                *const ODE,
+                *f64,
+                [*]T,
                 f64,
             ) anyerror!void,
         };
@@ -33,10 +33,10 @@ pub fn Solver(comptime vector_size: u64) type {
             self.vtable.destroy(self);
         }
         pub inline fn integrate(
-            noalias self: *Self,
-            noalias ode: *const ODE,
-            noalias t: *f64,
-            noalias x: [*]T,
+            self: *Self,
+            ode: *const ODE,
+            t: *f64,
+            x: [*]T,
             t_end: f64,
         ) anyerror!void {
             try self.vtable.integrate(self, ode, t, x, t_end);
