@@ -3,7 +3,7 @@ const Argument = ds.Argument;
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
-pub const linear = @import("linear.zig");
+pub const Linear = @import("linear.zig").Linear;
 
 pub fn ODE(comptime v_size: u64) type {
     return struct {
@@ -11,8 +11,8 @@ pub fn ODE(comptime v_size: u64) type {
         pub const vector_size = v_size;
         pub const T = if (vector_size == 0) f64 else @Vector(vector_size, f64);
 
-        x_size: u64,
-        p_size: u64,
+        x_dim: u64,
+        p_dim: u64,
         t: f64,
         x: []T,
         p: []T,
@@ -37,17 +37,17 @@ pub fn ODE(comptime v_size: u64) type {
         pub inline fn get_p_len(self: Self) u64 {
             return self.p.len;
         }
-        pub inline fn get_x_size(self: Self) u64 {
-            return self.x_size;
+        pub inline fn get_x_dim(self: Self) u64 {
+            return self.x_dim;
         }
-        pub inline fn get_p_size(self: Self) u64 {
-            return self.p_size;
+        pub inline fn get_p_dim(self: Self) u64 {
+            return self.p_dim;
         }
         pub fn get_t(self: Self) f64 {
             return self.t;
         }
         pub fn get_x(self: Self, i: u64) f64 {
-            if (i < self.x_size()) {
+            if (i < self.x_dim()) {
                 if (comptime 0 == vector_size)
                     return self.x[i]
                 else
@@ -55,15 +55,12 @@ pub fn ODE(comptime v_size: u64) type {
             } else return 0.0;
         }
         pub fn get_p(self: Self, i: u64) f64 {
-            if (i < self.get_p_size()) {
+            if (i < self.get_p_dim()) {
                 if (comptime 0 == vector_size)
                     return self.p[i]
                 else
                     return self.p[i / vector_size][i % vector_size];
             } else return 0.0;
-        }
-        pub fn get(self: Self) struct { t: f64, x: []const T, p: []const T } {
-            return .{ .t = self.t, .x = self.x, .p = self.p };
         }
         pub fn set(
             self: *Self,
@@ -71,7 +68,7 @@ pub fn ODE(comptime v_size: u64) type {
         ) void {
             if (state.t) |t| self.t = t;
             if (state.x) |x| {
-                const n = if (x.len > self.x_size) self.x_size else x.len;
+                const n = if (x.len > self.x_dim) self.x_dim else x.len;
                 for (0..n) |i| {
                     if (comptime vector_size == 0)
                         self.x[i] = x[i]
@@ -80,7 +77,7 @@ pub fn ODE(comptime v_size: u64) type {
                 }
             }
             if (state.p) |p| {
-                const m = if (p.len > self.p_size) self.p_size else p.len;
+                const m = if (p.len > self.p_dim) self.p_dim else p.len;
                 for (0..m) |i| {
                     if (comptime vector_size == 0)
                         self.p[i] = p[i]
@@ -120,5 +117,5 @@ comptime {
 }
 
 test {
-    _ = linear;
+    _ = Linear;
 }
