@@ -6,8 +6,8 @@ pub fn main() !void {
     defer arena.deinit();
     const allocator = arena.allocator();
 
-    const vector_size = 6;
-    const x_dim = 2;
+    const x_dim = 4;
+    const vector_size = 2;
     var solver = try ds.solver.RK4(vector_size).create(allocator, 0.01);
     defer solver.destroy();
 
