@@ -31,7 +31,7 @@ pub fn Linear(comptime v_size: u64) type {
             errdefer allocator.free(x);
 
             const p_size = x_size * x_size;
-            const p_len = if (vector_size == 0) p_size else if (p_size % vector_size > 0) p_size / vector_size + 1 else p_size / vector_size;
+            const p_len = x_len * x_len;
             const p = try allocator.alloc(T, p_len);
             errdefer allocator.free(p);
 
@@ -76,17 +76,10 @@ pub fn Linear(comptime v_size: u64) type {
                     }
                 }
             } else {
-                for (0..self.x_dim) |i| {
-                    const dxdt_s_i = i / vector_size;
-                    const dxdt_v_i = i % vector_size;
-                    dxdt[dxdt_s_i][dxdt_v_i] = 0;
-                    for (0..self.x_dim) |j| {
-                        const p_j = i * self.x_dim + j;
-                        const p_s_j = p_j / vector_size;
-                        const p_v_j = p_j % vector_size;
-                        const x_s_j = j / vector_size;
-                        const x_v_j = j % vector_size;
-                        dxdt[dxdt_s_i][dxdt_v_i] += self.p[p_s_j][p_v_j] * x[x_s_j][x_v_j];
+                for (0..self.get_x_len()) |i| {
+                    dxdt[i] = @splat(0);
+                    for (0..self.get_x_len()) |j| {
+                        dxdt[i] += self.p[i * self.get_x_len() + j] * x[j];
                     }
                 }
             }
