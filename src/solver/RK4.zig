@@ -124,6 +124,8 @@ pub fn RK4(comptime vector_size: u64) type {
             x: [*]T,
             t_end: f64,
         ) !void {
+            @setRuntimeSafety(false);
+            @setFloatMode(.optimized);
             const data: *Data = @ptrCast(@alignCast(self.data));
             self.dim = ode.get_x_dim();
             if (data.capacity < self.dim) {

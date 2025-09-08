@@ -4,7 +4,6 @@ const ds = @import("dynamical_systems");
 pub fn main() !void {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-
     const allocator = arena.allocator();
 
     var solver = try ds.solver.RK4(0).create(allocator, 0.01);

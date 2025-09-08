@@ -65,6 +65,8 @@ pub fn Linear(comptime v_size: u64) type {
         }
 
         fn calc(self: *const ODE, t: f64, x: [*]const T, dxdt: [*]T) void {
+            @setRuntimeSafety(false);
+            @setFloatMode(.optimized);
             _ = t;
             if (comptime vector_size == 0) {
                 for (0..self.x_dim) |i| {
