@@ -19,75 +19,46 @@ pub fn RK4(comptime vector_size: u64) type {
 
         const Data = struct {
             capacity: u64,
+            buffer: []T,
             y: []T,
             k1: []T,
             k2: []T,
             k3: []T,
             k4: []T,
 
-            fn alloc(allocator: Allocator, capacity: u64) !Data {
-                const y = try allocator.alloc(T, capacity);
-                errdefer allocator.free(y);
-                const k1 = try allocator.alloc(T, capacity);
-                errdefer allocator.free(k1);
-                const k2 = try allocator.alloc(T, capacity);
-                errdefer allocator.free(k2);
-                const k3 = try allocator.alloc(T, capacity);
-                errdefer allocator.free(k3);
-                const k4 = try allocator.alloc(T, capacity);
-                errdefer allocator.free(k4);
+            fn alloc(allocator: Allocator, n: u64) !Data {
+                const buffer = try allocator.alloc(T, n * 5);
 
                 return .{
-                    .capacity = capacity,
-                    .y = y,
-                    .k1 = k1,
-                    .k2 = k2,
-                    .k3 = k3,
-                    .k4 = k4,
+                    .capacity = n,
+                    .buffer = buffer,
+                    .y = buffer[0..n],
+                    .k1 = buffer[n .. 2 * n],
+                    .k2 = buffer[2 * n .. 3 * n],
+                    .k3 = buffer[3 * n .. 4 * n],
+                    .k4 = buffer[4 * n .. 5 * n],
                 };
             }
 
-            fn resize(self: *Data, allocator: Allocator, capacity: u64) !void {
+            fn resize(self: *Data, allocator: Allocator, n: u64) !void {
                 self.free(allocator);
-                self.capacity = capacity;
-                self.y = try allocator.realloc(self.y, capacity);
-                errdefer allocator.free(self.y);
-                self.k1 = try allocator.realloc(self.k1, capacity);
-                errdefer allocator.free(self.k1);
-                self.k2 = try allocator.realloc(self.k2, capacity);
-                errdefer allocator.free(self.k2);
-                self.k3 = try allocator.realloc(self.k3, capacity);
-                errdefer allocator.free(self.k3);
-                self.k4 = try allocator.realloc(self.k4, capacity);
-                errdefer allocator.free(self.k4);
+                const buffer = try allocator.alloc(T, n * 5);
+                errdefer allocator.free(buffer);
+                self.buffer = buffer;
+                self.y = buffer[0..n];
+                self.k1 = buffer[n .. 2 * n];
+                self.k2 = buffer[2 * n .. 3 * n];
+                self.k3 = buffer[3 * n .. 4 * n];
+                self.k4 = buffer[4 * n .. 5 * n];
             }
 
-            fn free(self: Data, allocator: Allocator) void {
-                allocator.free(self.y);
-                allocator.free(self.k1);
-                allocator.free(self.k2);
-                allocator.free(self.k3);
-                allocator.free(self.k4);
+            fn free(self: *Data, allocator: Allocator) void {
+                allocator.free(self.buffer);
+                self.capacity = 0;
             }
         };
 
-        const arguments = [_]Argument{.{
-            .name = "h_max",
-            .value = .{ .f = 0.01 },
-        }};
-
-        pub const factory = SolverFactory{
-            .args = &arguments,
-            .vtable = &.{
-                .create = factory_create,
-            },
-        };
-
-        fn factory_create(allocator: Allocator, args: []const Argument) !Solver {
-            return try create(allocator, args[0].value.f);
-        }
-
-        pub fn create(allocator: Allocator, h_max: f64) !Solver {
+        pub fn init(allocator: Allocator, h_max: f64) !Solver {
             const args = try allocator.alloc(Argument, 1);
             errdefer allocator.free(args);
             args[0] = .{ .name = "h_max", .value = .{ .f = h_max } };
@@ -99,18 +70,17 @@ pub fn RK4(comptime vector_size: u64) type {
             errdefer data.free(allocator);
 
             return .{
-                .dim = capacity,
                 .allocator = allocator,
                 .args = args,
+                .dim = capacity,
                 .data = data,
                 .vtable = &.{
-                    .destroy = destroy,
+                    .deinit = deinit,
                     .integrate = integrate,
                 },
             };
         }
-
-        fn destroy(self: Solver) void {
+        fn deinit(self: *Solver) void {
             const data: *Data = @ptrCast(@alignCast(self.data));
             data.free(self.allocator);
             self.allocator.destroy(data);
@@ -127,7 +97,7 @@ pub fn RK4(comptime vector_size: u64) type {
             @setRuntimeSafety(false);
             @setFloatMode(.optimized);
             const data: *Data = @ptrCast(@alignCast(self.data));
-            self.dim = ode.get_x_dim();
+            self.dim = ode.x.len;
             if (data.capacity < self.dim) {
                 try data.resize(self.allocator, self.dim);
                 errdefer data.free(self.allocator);
@@ -162,6 +132,20 @@ pub fn RK4(comptime vector_size: u64) type {
                 t.* += h;
             }
         }
+
+        const arguments = [_]Argument{.{
+            .name = "h_max",
+            .value = .{ .f = 0.01 },
+        }};
+        fn create(allocator: Allocator, args: []const Argument) !Solver {
+            return try init(allocator, args[0].value.f);
+        }
+        pub const factory = SolverFactory{
+            .args = &arguments,
+            .vtable = &.{
+                .create = create,
+            },
+        };
     };
 }
 
@@ -170,4 +154,20 @@ comptime {
     _ = RK4(1);
     _ = RK4(2);
     _ = RK4(4);
+}
+
+test "Factory" {
+    const factory = RK4(0).factory;
+    const rk4 = try factory.create(
+        std.testing.allocator,
+        factory.args,
+    );
+    defer factory.destroy(rk4);
+
+    const factory_args = factory.getArguments();
+
+    for (rk4.args, 0..) |arg, i| {
+        try std.testing.expect(std.mem.eql(u8, arg.name, factory_args[i].name));
+        try std.testing.expect(arg.value.f == factory_args[i].value.f);
+    }
 }

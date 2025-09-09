@@ -5,94 +5,70 @@ const Allocator = std.mem.Allocator;
 
 pub const Linear = @import("linear.zig").Linear;
 
-pub fn ODE(comptime v_size: u64) type {
+pub fn ODE(comptime v_len: usize) type {
     return struct {
         pub const Self = @This();
-        pub const vector_size = v_size;
-        pub const T = if (vector_size == 0) f64 else @Vector(vector_size, f64);
+        pub const vector_len = v_len;
+        pub const T = if (vector_len == 0) f64 else @Vector(vector_len, f64);
 
+        allocator: Allocator,
+        args: []const Argument,
         x_dim: u64,
         p_dim: u64,
         t: f64,
         x: []T,
         p: []T,
-        args: []const Argument,
-        allocator: Allocator,
         vtable: *const VTable,
 
         pub const VTable = struct {
-            destroy: *const fn (Self) void,
+            deinit: *const fn (*Self) void,
             calc: *const fn (*const Self, f64, [*]const T, [*]T) void,
+            getT: *const fn (Self) f64,
+            getX: *const fn (Self, usize) f64,
+            getP: *const fn (Self, usize) f64,
+            setT: *const fn (*Self, f64) void,
+            setX: *const fn (*Self, []const f64) void,
+            setP: *const fn (*Self, []const f64) void,
         };
 
-        pub inline fn destroy(self: Self) void {
-            self.vtable.destroy(self);
+        pub inline fn deinit(self: *Self) void {
+            self.vtable.deinit(self);
         }
         pub inline fn calc(self: *const Self, t: f64, x: [*]const T, dxdt: [*]T) void {
             self.vtable.calc(self, t, x, dxdt);
         }
-        pub inline fn get_x_len(self: Self) u64 {
-            return self.x.len;
-        }
-        pub inline fn get_p_len(self: Self) u64 {
-            return self.p.len;
-        }
-        pub inline fn get_x_dim(self: Self) u64 {
+        pub inline fn getXDim(self: Self) usize {
             return self.x_dim;
         }
-        pub inline fn get_p_dim(self: Self) u64 {
+        pub inline fn getPDim(self: Self) usize {
             return self.p_dim;
         }
-        pub fn get_t(self: Self) f64 {
-            return self.t;
+        pub inline fn getT(self: Self) f64 {
+            return self.vtable.getT(self);
         }
-        pub fn get_x(self: Self, i: u64) f64 {
-            if (i < self.x_dim()) {
-                if (comptime 0 == vector_size)
-                    return self.x[i]
-                else
-                    return self.x[i / vector_size][i % vector_size];
-            } else return 0.0;
+        pub inline fn getX(self: Self, i: usize) f64 {
+            return self.vtable.getX(self, i);
         }
-        pub fn get_p(self: Self, i: u64) f64 {
-            if (i < self.get_p_dim()) {
-                if (comptime 0 == vector_size)
-                    return self.p[i]
-                else
-                    return self.p[i / vector_size][i % vector_size];
-            } else return 0.0;
+        pub inline fn getP(self: Self, i: usize) f64 {
+            return self.vtable.getP(self, i);
         }
-        pub fn set(
-            self: *Self,
-            state: struct { t: ?f64 = null, x: ?[]const f64 = null, p: ?[]const f64 = null },
-        ) void {
-            if (state.t) |t| self.t = t;
-            if (state.x) |x| {
-                const n = if (x.len > self.x_dim) self.x_dim else x.len;
-                for (0..n) |i| {
-                    if (comptime vector_size == 0)
-                        self.x[i] = x[i]
-                    else
-                        self.x[i / vector_size][i % vector_size] = x[i];
-                }
-            }
-            if (state.p) |p| {
-                const m = if (p.len > self.p_dim) self.p_dim else p.len;
-                for (0..m) |i| {
-                    if (comptime vector_size == 0)
-                        self.p[i] = p[i]
-                    else
-                        self.p[i / vector_size][i % vector_size] = p[i];
-                }
-            }
+        pub inline fn setT(self: *Self, t: f64) void {
+            self.vtable.setT(self, t);
+        }
+        pub inline fn setX(self: *Self, x: []const f64) void {
+            self.vtable.setX(self, x);
+        }
+        pub inline fn setP(self: *Self, p: []const f64) void {
+            self.vtable.setP(self, p);
         }
     };
 }
 
-pub fn ODEFactory(comptime vector_size: u64) type {
-    const ODEType = ODE(vector_size);
+pub fn ODEFactory(comptime vector_len: usize) type {
+    const ODEType = ODE(vector_len);
     return struct {
         pub const Self = @This();
+
         args: []const Argument,
         vtable: *const VTable,
 
@@ -100,10 +76,20 @@ pub fn ODEFactory(comptime vector_size: u64) type {
             create: *const fn (Allocator, []const Argument) anyerror!ODEType,
         };
 
-        pub inline fn create(self: Self, allocator: Allocator, args: []const Argument) anyerror!ODEType {
-            return try self.vtable.create(allocator, args);
+        pub fn create(self: Self, allocator: Allocator, args: []const Argument) anyerror!*ODEType {
+            const ode = try allocator.create(ODEType);
+            errdefer allocator.destroy(ode);
+            ode.* = try self.vtable.create(allocator, args);
+            errdefer ode.deinit();
+            return ode;
         }
-        pub fn arguments(self: Self) []const Argument {
+        pub fn destroy(self: Self, ode: *ODEType) void {
+            _ = self;
+            const allocator = ode.allocator;
+            ode.deinit();
+            allocator.destroy(ode);
+        }
+        pub fn getArguments(self: Self) []const Argument {
             return self.args;
         }
     };

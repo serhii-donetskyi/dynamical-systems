@@ -6,17 +6,14 @@ pub fn main() !void {
     defer arena.deinit();
     const allocator = arena.allocator();
 
-    const x_dim = 4;
-    const vector_size = 2;
-    var solver = try ds.solver.RK4(vector_size).create(allocator, 0.01);
-    defer solver.destroy();
+    const x_dim = 2;
+    const vector_len = 0;
 
-    var ode = try ds.ode.Linear(vector_size).create(allocator, x_dim);
-    defer ode.destroy();
-    ode.set(.{
-        .x = &@as([x_dim]f64, @splat(0.0)),
-        .p = &@as([x_dim * x_dim]f64, @splat(0.0)),
-    });
+    var solver = try ds.solver.RK4(vector_len).init(allocator, 0.01);
+    defer solver.deinit();
+
+    var ode = try ds.ode.Linear(vector_len).init(allocator, x_dim);
+    defer ode.deinit();
 
     try solver.integrate(&ode, &ode.t, ode.x.ptr, 1000000);
 }
