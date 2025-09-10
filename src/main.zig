@@ -1,19 +1,27 @@
 const std = @import("std");
 const ds = @import("dynamical_systems");
 
-pub fn main() !void {
+pub fn performance() !void {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
 
-    const x_dim = 2;
-    const vector_len = 0;
+    for ([_]usize{ 2, 4, 8, 16, 32, 64 }) |n| {
+        inline for ([_]usize{ 0, 2, 4, 8, 16, 32 }) |v_len| {
+            var linear = try ds.ode.Linear(v_len).init(allocator, n);
+            defer linear.deinit();
 
-    var solver = try ds.solver.RK4(vector_len).init(allocator, 0.01);
-    defer solver.deinit();
+            const start = std.time.nanoTimestamp();
+            for (0..10000) |_| {
+                linear.calc(linear.t, linear.x.ptr, linear.x.ptr);
+            }
+            const end = std.time.nanoTimestamp();
+            std.debug.print("Linear({}), n={}, duration: {}\n", .{ v_len, n, end - start });
+        }
+        std.debug.print("\n", .{});
+    }
+}
 
-    var ode = try ds.ode.Linear(vector_len).init(allocator, x_dim);
-    defer ode.deinit();
-
-    try solver.integrate(&ode, &ode.t, ode.x.ptr, 1000000);
+pub fn main() !void {
+    try performance();
 }

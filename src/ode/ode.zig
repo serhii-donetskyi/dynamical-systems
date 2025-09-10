@@ -5,11 +5,11 @@ const Allocator = std.mem.Allocator;
 
 pub const Linear = @import("linear.zig").Linear;
 
-pub fn ODE(comptime v_len: usize) type {
+pub fn ODE(comptime vector_len: usize) type {
     return struct {
         pub const Self = @This();
-        pub const vector_len = v_len;
-        pub const T = if (vector_len == 0) f64 else @Vector(vector_len, f64);
+        pub const v_len = vector_len;
+        pub const T = if (v_len == 0) f64 else @Vector(v_len, f64);
 
         allocator: Allocator,
         args: []const Argument,

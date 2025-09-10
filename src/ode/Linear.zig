@@ -4,10 +4,10 @@ const Argument = ds.Argument;
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
-pub fn Linear(comptime v_len: usize) type {
-    const ODEFactory = ds.ode.ODEFactory(v_len);
-    const ODE = ds.ode.ODE(v_len);
-    const vector_len = ODE.vector_len;
+pub fn Linear(comptime vector_len: usize) type {
+    const ODEFactory = ds.ode.ODEFactory(vector_len);
+    const ODE = ds.ode.ODE(vector_len);
+    const v_len = ODE.v_len;
     return struct {
         pub const T = ODE.T;
 
@@ -19,11 +19,11 @@ pub fn Linear(comptime v_len: usize) type {
             args[0] = .{ .name = "n", .value = .{ .u = n } };
 
             const x_dim = n;
-            const x_len = if (vector_len == 0) x_dim else if (x_dim % vector_len > 0) x_dim / vector_len + 1 else x_dim / vector_len;
+            const x_len = if (v_len == 0) x_dim else if (x_dim % v_len > 0) x_dim / v_len + 1 else x_dim / v_len;
             const x = try allocator.alloc(T, x_len);
             errdefer allocator.free(x);
             for (0..x_len) |i| {
-                x[i] = if (vector_len == 0) 0.0 else @splat(0.0);
+                x[i] = if (v_len == 0) 0.0 else @splat(0.0);
             }
 
             const p_dim = x_dim * x_dim;
@@ -31,7 +31,7 @@ pub fn Linear(comptime v_len: usize) type {
             const p = try allocator.alloc(T, p_len);
             errdefer allocator.free(p);
             for (0..p_len) |i| {
-                p[i] = if (vector_len == 0) 0.0 else @splat(0.0);
+                p[i] = if (v_len == 0) 0.0 else @splat(0.0);
             }
 
             return .{
@@ -64,7 +64,7 @@ pub fn Linear(comptime v_len: usize) type {
             @setRuntimeSafety(false);
             @setFloatMode(.optimized);
             _ = t;
-            if (comptime vector_len == 0) {
+            if (comptime v_len == 0) {
                 for (0..self.x_dim) |i| {
                     for (0..self.x_dim) |j| {
                         dxdt[i] += self.p[i * self.x_dim + j] * x[j];
@@ -76,7 +76,7 @@ pub fn Linear(comptime v_len: usize) type {
                     for (0..self.x.len) |j| {
                         tmp = @mulAdd(T, self.p[i * self.x.len + j], x[j], tmp);
                     }
-                    dxdt[i / vector_len][i % vector_len] = @reduce(.Add, tmp);
+                    dxdt[i / v_len][i % v_len] = @reduce(.Add, tmp);
                 }
             }
         }
@@ -84,19 +84,19 @@ pub fn Linear(comptime v_len: usize) type {
             return self.t;
         }
         fn getX(self: ODE, i: usize) f64 {
-            return if (comptime vector_len == 0)
+            return if (comptime v_len == 0)
                 self.x[i]
             else
-                self.x[i / vector_len][i % vector_len];
+                self.x[i / v_len][i % v_len];
         }
         fn getP(self: ODE, i: usize) f64 {
-            if (comptime vector_len == 0) {
+            if (comptime v_len == 0) {
                 return self.p[i];
             } else {
                 const cluster_idx = i / self.x_dim;
                 const cluster_offset = i % self.x_dim;
-                const idx = cluster_idx * self.x.len + cluster_offset / vector_len;
-                const offset = cluster_offset % vector_len;
+                const idx = cluster_idx * self.x.len + cluster_offset / v_len;
+                const offset = cluster_offset % v_len;
                 return self.p[idx][offset];
             }
         }
@@ -105,27 +105,27 @@ pub fn Linear(comptime v_len: usize) type {
         }
         fn setX(self: *ODE, x: []const f64) void {
             for (0..self.x.len) |i|
-                self.x[i] = if (vector_len == 0) 0.0 else @splat(0.0);
+                self.x[i] = if (v_len == 0) 0.0 else @splat(0.0);
             const n = if (self.x_dim > x.len) x.len else self.x_dim;
             for (0..n) |i| {
-                if (comptime vector_len == 0)
+                if (comptime v_len == 0)
                     self.x[i] = if (i < x.len) x[i] else 0.0
                 else
-                    self.x[i / vector_len][i % vector_len] = if (i < x.len) x[i] else 0.0;
+                    self.x[i / v_len][i % v_len] = if (i < x.len) x[i] else 0.0;
             }
         }
         fn setP(self: *ODE, p: []const f64) void {
             for (0..self.p.len) |i|
-                self.p[i] = if (vector_len == 0) 0.0 else @splat(0.0);
+                self.p[i] = if (v_len == 0) 0.0 else @splat(0.0);
             const n = if (self.p_dim > p.len) p.len else self.p_dim;
             for (0..n) |i| {
-                if (comptime vector_len == 0)
+                if (comptime v_len == 0)
                     self.p[i] = if (i < p.len) p[i] else 0.0
                 else {
                     const cluster_idx = i / self.x_dim;
                     const cluster_offset = i % self.x_dim;
-                    const idx = cluster_idx * self.x.len + cluster_offset / vector_len;
-                    const offset = cluster_offset % vector_len;
+                    const idx = cluster_idx * self.x.len + cluster_offset / v_len;
+                    const offset = cluster_offset % v_len;
                     self.p[idx][offset] = if (i < p.len) p[i] else 0.0;
                 }
             }
