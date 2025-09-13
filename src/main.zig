@@ -12,7 +12,7 @@ pub fn performance() !void {
             defer linear.deinit();
 
             const start = std.time.nanoTimestamp();
-            for (0..10000) |_| {
+            for (0..1000) |_| {
                 linear.calc(linear.t, linear.x.ptr, linear.x.ptr);
             }
             const end = std.time.nanoTimestamp();
