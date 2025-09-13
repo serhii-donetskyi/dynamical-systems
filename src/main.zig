@@ -6,20 +6,21 @@ pub fn performance() !void {
     defer arena.deinit();
     const allocator = arena.allocator();
 
-    for ([_]usize{ 2, 4, 8, 16, 32, 64 }) |n| {
-        inline for ([_]usize{ 0, 2, 4, 8, 16, 32 }) |v_len| {
-            var linear = try ds.ode.Linear(v_len).init(allocator, n);
-            defer linear.deinit();
+    inline for ([_]usize{ 2, 4, 8, 16, 32, 64 }) |v_len| {
+        var linear = try ds.ode.Linear(v_len).init(allocator, v_len);
+        defer linear.deinit();
 
-            const start = std.time.nanoTimestamp();
-            for (0..1000) |_| {
-                linear.calc(linear.t, linear.x.ptr, linear.x.ptr);
-            }
-            const end = std.time.nanoTimestamp();
-            std.debug.print("Linear({}), n={}, duration: {}\n", .{ v_len, n, end - start });
-        }
-        std.debug.print("\n", .{});
+        var solver = try ds.solver.RK4(v_len).init(allocator, 0.01);
+        defer solver.deinit();
+
+        const start = std.time.nanoTimestamp();
+
+        try solver.integrate(&linear, &linear.t, linear.x.ptr, linear.t + 1000.0);
+
+        const end = std.time.nanoTimestamp();
+        std.debug.print("RK4({}), duration: {}\n", .{ v_len, end - start });
     }
+    std.debug.print("\n", .{});
 }
 
 pub fn main() !void {
