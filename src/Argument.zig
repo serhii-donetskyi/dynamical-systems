@@ -3,8 +3,8 @@ const std = @import("std");
 pub const Argument = @This();
 
 pub const Value = union(enum) {
-    i: i64,
-    u: u64,
+    i: isize,
+    u: usize,
     f: f64,
     s: []const u8,
 };

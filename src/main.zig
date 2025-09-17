@@ -6,19 +6,13 @@ pub fn performance() !void {
     defer arena.deinit();
     const allocator = arena.allocator();
 
-    inline for ([_]usize{ 2, 4, 8, 16, 32, 64 }) |v_len| {
-        var linear = try ds.ode.Linear(v_len).init(allocator, v_len);
-        defer linear.deinit();
+    var linear = try ds.ode.Linear(0).init(allocator, 2);
+    defer linear.deinit();
 
-        var solver = try ds.solver.RK4(v_len).init(allocator, 0.01);
-        defer solver.deinit();
+    var solver = try ds.solver.RK4(0).init(allocator, 0.01);
+    defer solver.deinit();
 
-        const start = std.time.nanoTimestamp();
-        try solver.integrate(&linear, &linear.t, linear.x.ptr, linear.t + 1000.0);
-        const end = std.time.nanoTimestamp();
-        std.debug.print("RK4({}), duration: {}\n", .{ v_len, end - start });
-    }
-    std.debug.print("\n", .{});
+    try solver.integrate(&linear, &linear.t, linear.x.ptr, linear.t + 1e6);
 }
 
 pub fn main() !void {
@@ -26,19 +20,20 @@ pub fn main() !void {
     defer arena.deinit();
     const allocator = arena.allocator();
 
-    // Get the executable path
-    const exe_path = try std.fs.selfExePathAlloc(allocator);
-    defer allocator.free(exe_path);
+    // // Get the executable path
+    // const exe_path = try std.fs.selfExePathAlloc(allocator);
+    // defer allocator.free(exe_path);
 
-    // Get the directory containing the executable
-    const exe_dir = std.fs.path.dirname(exe_path) orelse ".";
-    std.debug.print("Executable directory: {s}\n", .{exe_dir});
+    // // Get the directory containing the executable
+    // const exe_dir = std.fs.path.dirname(exe_path) orelse ".";
+    // std.debug.print("Executable directory: {s}\n", .{exe_dir});
 
-    var args = try std.process.argsWithAllocator(allocator);
-    defer args.deinit();
+    var arg_parser = try ds.ArgParser.init(allocator);
+    defer arg_parser.deinit();
+    try arg_parser.addArgument(.{ .name = "--n", .description = "The number of steps" });
 
-    // Handle arguments here if needed
-    while (args.next()) |arg| {
-        std.debug.print("Argument: {s}\n", .{arg});
-    }
+    arg_parser.parse() catch |err| {
+        if (err == ds.ArgParser.Error.HelpRequested) return;
+        return err;
+    };
 }

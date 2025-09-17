@@ -7,7 +7,7 @@ const Allocator = std.mem.Allocator;
 
 pub fn Linear(comptime v_len: usize) type {
     return struct {
-        pub fn init(allocator: Allocator, n: u64) !ODE {
+        pub fn init(allocator: Allocator, n: usize) !ODE {
             const t = 0.0;
 
             const args = try allocator.alloc(Argument, 1);

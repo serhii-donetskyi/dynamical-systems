@@ -8,8 +8,8 @@ pub const Linear = @import("linear.zig").Linear;
 pub const ODE = struct {
     allocator: Allocator,
     args: []const Argument,
-    x_dim: u64,
-    p_dim: u64,
+    x_dim: usize,
+    p_dim: usize,
     t: f64,
     x: []f64,
     p: []f64,
