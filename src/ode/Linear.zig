@@ -125,13 +125,6 @@ pub const factory = ODE.Factory{
     },
 };
 
-comptime {
-    _ = Linear(0);
-    _ = Linear(1);
-    _ = Linear(2);
-    _ = Linear(4);
-}
-
 test "Factory" {
     const n = 2;
 
