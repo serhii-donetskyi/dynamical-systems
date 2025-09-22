@@ -5,7 +5,8 @@ const ODE = ds.ode.ODE;
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
-pub const RK4 = @import("rk4.zig").RK4;
+pub const rk4 = @import("rk4.zig");
+pub const RK4 = rk4.RK4;
 
 pub const Solver = struct {
     allocator: Allocator,
@@ -40,7 +41,7 @@ pub const Solver = struct {
             getArguments: *const fn () []const Argument,
         };
 
-        pub inline fn init(self: Factory, allocator: Allocator, args: []const Argument) anyerror!*Solver {
+        pub inline fn init(self: Factory, allocator: Allocator, args: []const Argument) anyerror!Solver {
             return self.vtable.init(allocator, args);
         }
         pub inline fn getArguments(self: Factory) []const Argument {
@@ -50,5 +51,5 @@ pub const Solver = struct {
 };
 
 test {
-    _ = RK4;
+    std.testing.refAllDecls(@This());
 }

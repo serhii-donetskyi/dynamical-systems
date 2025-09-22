@@ -222,7 +222,7 @@ pub fn RK4(comptime v_len: usize) type {
     };
 }
 
-fn create(allocator: Allocator, args: []const Argument) !Solver {
+fn init(allocator: Allocator, args: []const Argument) !Solver {
     const h_max = args[0].value.f;
     inline for ([_]usize{ 32, 16, 8, 4, 2 }) |v_len| {
         if (h_max >= v_len)
@@ -237,19 +237,19 @@ fn getArguments() []const Argument {
     }};
     return &arguments;
 }
-pub const factory = Factory{
+pub const factory = Solver.Factory{
     .vtable = &.{
-        .create = create,
+        .init = init,
         .getArguments = getArguments,
     },
 };
 
-test "Factory" {
-    var rk4 = try factory.create(
+test "factory" {
+    var rk4 = try factory.init(
         std.testing.allocator,
         factory.getArguments(),
     );
-    defer factory.destroy(rk4);
+    defer rk4.deinit();
 
     for ([_]usize{ 8, 16 }) |n| {
         var linear = try ds.ode.Linear(0).init(std.testing.allocator, n);

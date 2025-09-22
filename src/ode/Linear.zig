@@ -1,4 +1,4 @@
-const ds = @import("dynamical_systems");
+const ds = @import("../dynamical_systems.zig");
 const Argument = ds.Argument;
 const ODE = ds.ode.ODE;
 
@@ -125,7 +125,7 @@ pub const factory = ODE.Factory{
     },
 };
 
-test "Factory" {
+test "factory" {
     const n = 2;
 
     var ode = try factory.init(

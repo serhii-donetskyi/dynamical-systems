@@ -4,7 +4,8 @@ const Argument = ds.Argument;
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
-pub const Linear = @import("Linear.zig");
+pub const linear = @import("linear.zig");
+pub const Linear = linear.Linear;
 
 pub const ODE = struct {
     allocator: Allocator,
@@ -75,6 +76,6 @@ pub const ODE = struct {
     };
 };
 
-test "all" {
-    _ = Linear;
+test {
+    std.testing.refAllDecls(@This());
 }
