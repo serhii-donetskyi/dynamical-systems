@@ -31,32 +31,32 @@ pub const Solver = struct {
     ) anyerror!void {
         try self.vtable.integrate(self, ode, t, x, t_end);
     }
-};
 
-pub const SolverFactory = struct {
-    vtable: *const VTable,
+    pub const Factory = struct {
+        vtable: *const Factory.VTable,
 
-    const VTable = struct {
-        create: *const fn (Allocator, []const Argument) anyerror!Solver,
-        getArguments: *const fn () []const Argument,
+        const VTable = struct {
+            create: *const fn (Allocator, []const Argument) anyerror!Solver,
+            getArguments: *const fn () []const Argument,
+        };
+
+        pub inline fn create(self: Factory, allocator: Allocator, args: []const Argument) anyerror!*Solver {
+            const solver = try allocator.create(Solver);
+            errdefer allocator.destroy(solver);
+            solver.* = try self.vtable.create(allocator, args);
+            errdefer solver.deinit();
+            return solver;
+        }
+        pub fn destroy(self: Factory, solver: *Solver) void {
+            _ = self;
+            const allocator = solver.allocator;
+            solver.deinit();
+            allocator.destroy(solver);
+        }
+        pub fn getArguments(self: Factory) []const Argument {
+            return self.vtable.getArguments();
+        }
     };
-
-    pub inline fn create(self: SolverFactory, allocator: Allocator, args: []const Argument) anyerror!*Solver {
-        const solver = try allocator.create(Solver);
-        errdefer allocator.destroy(solver);
-        solver.* = try self.vtable.create(allocator, args);
-        errdefer solver.deinit();
-        return solver;
-    }
-    pub fn destroy(self: SolverFactory, solver: *Solver) void {
-        _ = self;
-        const allocator = solver.allocator;
-        solver.deinit();
-        allocator.destroy(solver);
-    }
-    pub fn getArguments(self: SolverFactory) []const Argument {
-        return self.vtable.getArguments();
-    }
 };
 
 test {
