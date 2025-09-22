@@ -36,24 +36,14 @@ pub const Solver = struct {
         vtable: *const Factory.VTable,
 
         const VTable = struct {
-            create: *const fn (Allocator, []const Argument) anyerror!Solver,
+            init: *const fn (Allocator, []const Argument) anyerror!Solver,
             getArguments: *const fn () []const Argument,
         };
 
-        pub inline fn create(self: Factory, allocator: Allocator, args: []const Argument) anyerror!*Solver {
-            const solver = try allocator.create(Solver);
-            errdefer allocator.destroy(solver);
-            solver.* = try self.vtable.create(allocator, args);
-            errdefer solver.deinit();
-            return solver;
+        pub inline fn init(self: Factory, allocator: Allocator, args: []const Argument) anyerror!*Solver {
+            return self.vtable.init(allocator, args);
         }
-        pub fn destroy(self: Factory, solver: *Solver) void {
-            _ = self;
-            const allocator = solver.allocator;
-            solver.deinit();
-            allocator.destroy(solver);
-        }
-        pub fn getArguments(self: Factory) []const Argument {
+        pub inline fn getArguments(self: Factory) []const Argument {
             return self.vtable.getArguments();
         }
     };

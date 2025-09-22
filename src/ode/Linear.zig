@@ -1,4 +1,4 @@
-const ds = @import("../dynamical_systems.zig");
+const ds = @import("dynamical_systems");
 const Argument = ds.Argument;
 const ODE = ds.ode.ODE;
 
@@ -103,7 +103,7 @@ pub fn Linear(comptime v_len: usize) type {
     };
 }
 
-fn create(allocator: Allocator, args: []const Argument) !ODE {
+fn init(allocator: Allocator, args: []const Argument) !ODE {
     const n = args[0].value.u;
     inline for ([_]usize{ 32, 16, 8, 4, 2 }) |v_len| {
         if (n >= v_len)
@@ -120,7 +120,7 @@ fn getArguments() []const Argument {
 }
 pub const factory = ODE.Factory{
     .vtable = &.{
-        .create = create,
+        .init = init,
         .getArguments = getArguments,
     },
 };
@@ -128,28 +128,28 @@ pub const factory = ODE.Factory{
 test "Factory" {
     const n = 2;
 
-    var linear = try factory.create(
+    var ode = try factory.init(
         std.testing.allocator,
         &[_]Argument{.{
             .name = "n",
             .value = .{ .u = n },
         }},
     );
-    defer factory.destroy(linear);
+    defer ode.deinit();
 
     const t = @as(f64, 0.0);
     const x = &[_]f64{ 1.0, 1.0 };
     const p = &[_]f64{ 0.0, 1.0, -1.0, 0.0 };
     var dxdt = [_]f64{ 0.0, 0.0 };
 
-    linear.setT(t);
-    linear.setX(x);
-    linear.setP(p);
+    ode.setT(t);
+    ode.setX(x);
+    ode.setP(p);
 
-    linear.calc(t, linear.x.ptr, &dxdt);
+    ode.calc(t, ode.x.ptr, &dxdt);
 
-    try std.testing.expect(linear.x_dim == 2);
-    try std.testing.expect(linear.p_dim == 4);
+    try std.testing.expect(ode.x_dim == 2);
+    try std.testing.expect(ode.p_dim == 4);
     try std.testing.expect(dxdt[0] == 1.0);
     try std.testing.expect(dxdt[1] == -1.0);
 }

@@ -1,9 +1,10 @@
 const ds = @import("../dynamical_systems.zig");
 const Argument = ds.Argument;
+
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
-pub const Linear = @import("linear.zig").Linear;
+pub const Linear = @import("Linear.zig");
 
 pub const ODE = struct {
     allocator: Allocator,
@@ -61,29 +62,19 @@ pub const ODE = struct {
         vtable: *const Factory.VTable,
 
         const VTable = struct {
-            create: *const fn (Allocator, []const Argument) anyerror!ODE,
+            init: *const fn (Allocator, []const Argument) anyerror!ODE,
             getArguments: *const fn () []const Argument,
         };
 
-        pub fn create(self: Factory, allocator: Allocator, args: []const Argument) anyerror!*ODE {
-            const ode = try allocator.create(ODE);
-            errdefer allocator.destroy(ode);
-            ode.* = try self.vtable.create(allocator, args);
-            errdefer ode.deinit();
-            return ode;
+        pub inline fn init(self: Factory, allocator: Allocator, args: []const Argument) anyerror!ODE {
+            return self.vtable.init(allocator, args);
         }
-        pub fn destroy(self: Factory, ode: *ODE) void {
-            _ = self;
-            const allocator = ode.allocator;
-            ode.deinit();
-            allocator.destroy(ode);
-        }
-        pub fn getArguments(self: Factory) []const Argument {
+        pub inline fn getArguments(self: Factory) []const Argument {
             return self.vtable.getArguments();
         }
     };
 };
 
-test {
+test "all" {
     _ = Linear;
 }

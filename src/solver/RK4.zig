@@ -2,7 +2,7 @@ const ds = @import("../dynamical_systems.zig");
 const Argument = ds.Argument;
 const ODE = ds.ode.ODE;
 const Solver = ds.solver.Solver;
-const SolverFactory = ds.solver.SolverFactory;
+const Factory = ds.solver.Solver.Factory;
 
 const std = @import("std");
 const Allocator = std.mem.Allocator;
@@ -237,7 +237,7 @@ fn getArguments() []const Argument {
     }};
     return &arguments;
 }
-pub const factory = SolverFactory{
+pub const factory = Factory{
     .vtable = &.{
         .create = create,
         .getArguments = getArguments,
