@@ -1,139 +1,182 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
-const HashMap = std.StringHashMap(Argument);
+
 pub const Error = error{
+    MissingArgument,
+    UnparsedArgument,
+    UnknownArgument,
+    UnknownValue,
     HelpRequested,
-    InvalidOption,
-    InvalidArgument,
-    MissingOption,
 };
-const ArgParser = @This();
 
-allocator: Allocator,
-map: HashMap,
+fn hash(key: []const u8) usize {
+    var res = @as(usize, 5381);
+    for (key) |c| {
+        res = (res << 5) + res + c;
+    }
+    return res;
+}
 
-const Argument = struct {
+pub const Argument = struct {
+    name: []const u8,
     description: ?[]const u8 = null,
     default: ?[]const u8 = null,
-    value: ?[]const u8 = null,
 };
 
-pub fn init(allocator: Allocator) !ArgParser {
-    return .{
-        .allocator = allocator,
-        .map = HashMap.init(allocator),
+fn isArgument(name: []const u8) bool {
+    return name.len > 0 and name[0] == '-';
+}
+
+pub fn ArgParser(comptime arguments: []const Argument) type {
+    for (arguments) |argument| {
+        if (!isArgument(argument.name)) {
+            @compileError("Argument name must start with '-' but got: " ++ argument.name);
+        }
+    }
+    const len = arguments.len;
+    const values = blk: {
+        var values: [len]?[]const u8 = undefined;
+        for (0..len) |i| {
+            values[i] = arguments[i].default;
+        }
+        break :blk values;
+    };
+    const help_string = blk: {
+        var res: []const u8 = undefined;
+        res = "Options:\n";
+        const spaces: [16]u8 = @splat(' ');
+        for (arguments) |argument| {
+            res = res ++ "  " ++ argument.name ++ " [value]" ++ spaces[0 .. spaces.len - argument.name.len] ++ (argument.description orelse "") ++ "\n";
+        }
+        break :blk res;
+    };
+    return struct {
+        const Self = @This();
+        const Enum: type = blk: {
+            var enumFields: [len]std.builtin.Type.EnumField = undefined;
+            for (0..len) |i| {
+                enumFields[i] = .{
+                    .name = arguments[i].name[0..arguments[i].name.len :0],
+                    .value = hash(arguments[i].name),
+                };
+            }
+            break :blk @Type(.{ .@"enum" = .{
+                .tag_type = usize,
+                .fields = &enumFields,
+                .decls = &[_]std.builtin.Type.Declaration{},
+                .is_exhaustive = false,
+            } });
+        };
+
+        comptime arguments: []const Argument = arguments,
+        values: [len]?[]const u8 = values,
+
+        fn getIndex(self: Self, name: []const u8) ?usize {
+            _ = self;
+            const e = @as(Enum, @enumFromInt(hash(name)));
+            switch (e) {
+                inline else => |tag| {
+                    return comptime blk: {
+                        for (@typeInfo(Enum).@"enum".fields, 0..) |field, i| {
+                            if (@intFromEnum(tag) == field.value) {
+                                break :blk i;
+                            }
+                        }
+                    };
+                },
+                _ => return null,
+            }
+        }
+        pub fn getArgument(self: Self, name: []const u8) ![]const u8 {
+            const index = self.getIndex(name) orelse return Error.UnknownArgument;
+            return self.values[index] orelse return Error.UnparsedArgument;
+        }
+        pub fn parse(self: *Self, args: []const []const u8) !void {
+            var option: ?[]const u8 = null;
+            for (args) |arg| {
+                if (self.getIndex(arg)) |index| {
+                    self.values[index] = "";
+                    option = arg;
+                } else if (option) |opt| {
+                    const index = self.getIndex(opt) orelse unreachable;
+                    self.values[index] = arg;
+                    option = null;
+                } else if (isArgument(arg)) {
+                    if (std.mem.eql(u8, arg, "--help") or std.mem.eql(u8, arg, "-h")) {
+                        return Error.HelpRequested;
+                    }
+                    return Error.UnknownArgument;
+                } else {
+                    return Error.UnknownValue;
+                }
+            }
+            for (self.values) |value| {
+                if (null == value) {
+                    return Error.MissingArgument;
+                }
+            }
+        }
+        pub fn getHelpString(self: Self) []const u8 {
+            _ = self;
+            return help_string;
+        }
     };
 }
-pub fn deinit(self: *ArgParser) void {
-    self.map.deinit();
+
+pub fn init(comptime arguments: []const Argument) ArgParser(arguments) {
+    return .{};
 }
-pub fn addArgument(
-    self: *ArgParser,
-    options: struct {
-        name: []const u8,
-        description: ?[]const u8 = null,
-        default: ?[]const u8 = null,
-    },
-) !void {
-    if (!isOption(options.name)) return error.InvalidOption;
-    try self.map.put(
-        options.name,
+
+test "parser init" {
+    var parser = init(&.{
+        .{ .name = "-a" },
         .{
-            .description = options.description,
-            .default = options.default,
-            .value = null,
+            .name = "-b",
+            .default = "b",
+            .description = "b description",
         },
+    });
+    const Enum = @TypeOf(parser).Enum;
+    const a = Enum.@"-a";
+
+    // test Enum
+    try std.testing.expectEqual(hash("-a"), @intFromEnum(a));
+
+    // test getArgument
+    try std.testing.expectEqual(Error.UnparsedArgument, parser.getArgument("-a"));
+    try std.testing.expectEqual(Error.UnknownArgument, parser.getArgument("-c"));
+    try std.testing.expectEqualStrings("b", try parser.getArgument("-b"));
+
+    // test getHelpString
+    try std.testing.expectEqualStrings(
+        parser.getHelpString(),
+        "Options:\n  -a [value]              \n  -b [value]              b description\n",
     );
 }
-pub fn parse(self: *ArgParser) !void {
-    var args = try std.process.argsWithAllocator(self.allocator);
-    defer args.deinit();
-    const name = args.next() orelse unreachable;
 
-    var option: ?[]const u8 = null;
-    while (args.next()) |arg| {
-        if (self.map.contains(arg)) {
-            var get_put = try self.map.getOrPut(arg);
-            get_put.value_ptr.value = "";
-            option = arg;
-        } else if (option) |opt| {
-            var get_put = try self.map.getOrPut(opt);
-            get_put.value_ptr.value = arg;
-            option = null;
-        } else if (isOption(arg)) {
-            if (std.mem.eql(u8, arg, "--help") or std.mem.eql(u8, arg, "-h")) {
-                try self.printUsage(name);
-                return Error.HelpRequested;
-            }
-            return Error.InvalidOption;
-        } else {
-            return Error.InvalidArgument;
-        }
-    }
+test "parser parse" {
+    var parser = init(&.{
+        .{ .name = "-a" },
+        .{ .name = "-b", .default = "b" },
+    });
 
-    var iter = self.map.iterator();
-    while (iter.next()) |entry| {
-        if (entry.value_ptr.value) |_| {
-            continue;
-        } else if (entry.value_ptr.default) |default| {
-            entry.value_ptr.value = default;
-        } else {
-            std.log.err(
-                "Required argument {s} has not been provided\n",
-                .{entry.key_ptr.*},
-            );
-            return Error.MissingOption;
-        }
-    }
-}
-pub fn getArgument(self: ArgParser, name: []const u8) ?[:0]const u8 {
-    const arg = self.map.get(name);
-    if (arg) |a| return a.value;
-}
-pub fn printUsage(self: ArgParser, name: []const u8) !void {
-    const spaces = " " ** 32;
-    var writer = std.fs.File.stdout().writer(&.{});
-    try writer.interface.print("Usage: {s} [options]\n", .{name});
-    try writer.interface.print("\n", .{});
-    try writer.interface.print("Options:\n", .{});
-    var iter = self.map.iterator();
-    while (iter.next()) |entry| {
-        try writer.interface.print(
-            "  {s} {s}{s}{s}\n",
-            .{
-                entry.key_ptr.*,
-                "[value]",
-                spaces[0 .. spaces.len - entry.key_ptr.len],
-                entry.value_ptr.description orelse "",
-            },
-        );
-    }
-}
+    // test parse errors
+    try std.testing.expectEqual(Error.MissingArgument, parser.parse(&.{}));
+    try std.testing.expectEqual(Error.UnknownArgument, parser.parse(&.{ "-c", "1" }));
+    try std.testing.expectEqual(Error.UnknownValue, parser.parse(&.{"a"}));
+    try std.testing.expectEqual(Error.HelpRequested, parser.parse(&.{"--help"}));
+    try std.testing.expectEqual(Error.HelpRequested, parser.parse(&.{"-h"}));
 
-fn isOption(arg: anytype) bool {
-    const T = @TypeOf(arg);
-    if (T != []const u8 and T != [:0]const u8) {
-        @compileError("arg must be a string slice");
-    }
-    return arg[0] == '-';
-}
+    // test parse success
+    try parser.parse(&.{ "-a", "1" });
+    try std.testing.expectEqualStrings("1", try parser.getArgument("-a"));
+    try std.testing.expectEqualStrings("b", try parser.getArgument("-b"));
 
-test "No options" {
-    var arg_parser = try ArgParser.init(std.testing.allocator);
-    defer arg_parser.deinit();
-    try arg_parser.parse();
-}
+    try parser.parse(&.{ "-b", "2" });
+    try std.testing.expectEqualStrings("1", try parser.getArgument("-a"));
+    try std.testing.expectEqualStrings("2", try parser.getArgument("-b"));
 
-test "Invalid option" {
-    var arg_parser = try ArgParser.init(std.testing.allocator);
-    defer arg_parser.deinit();
-    try arg_parser.addArgument(.{ .name = "--n" });
-    std.testing.expectError(Error.MissingOption, arg_parser.parse());
-}
-
-test "Invalid argument" {
-    var arg_parser = try ArgParser.init(std.testing.allocator);
-    defer arg_parser.deinit();
-    try arg_parser.addArgument(.{ .name = "--n" });
-    try arg_parser.parse();
+    try parser.parse(&.{ "-b", "1", "-a", "2" });
+    try std.testing.expectEqualStrings("2", try parser.getArgument("-a"));
+    try std.testing.expectEqualStrings("1", try parser.getArgument("-b"));
 }
