@@ -26,7 +26,7 @@ test "test argument" {
 
     switch (s_argument.value) {
         .s => |s| {
-            try std.testing.expect(std.mem.eql(u8, s, name));
+            try std.testing.expectEqualStrings(s, name);
         },
         else => unreachable,
     }
