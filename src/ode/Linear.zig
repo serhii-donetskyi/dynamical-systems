@@ -155,8 +155,8 @@ test "Factory" {
 
     linear.calc(t, linear.x.ptr, &dxdt);
 
-    try std.testing.expect(2 == linear.x_dim);
-    try std.testing.expect(4 == linear.p_dim);
-    try std.testing.expect(1.0 == dxdt[0]);
-    try std.testing.expect(-1.0 == dxdt[1]);
+    try std.testing.expect(linear.x_dim == 2);
+    try std.testing.expect(linear.p_dim == 4);
+    try std.testing.expect(dxdt[0] == 1.0);
+    try std.testing.expect(dxdt[1] == -1.0);
 }
