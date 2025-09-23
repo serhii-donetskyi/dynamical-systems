@@ -1,71 +1,68 @@
 const ds = @import("../dynamical_systems.zig");
 const Argument = ds.Argument;
 const ODE = ds.ode.ODE;
-
 const std = @import("std");
 const Allocator = std.mem.Allocator;
+const Linear = @This();
 
-pub fn Linear(comptime v_len: usize) type {
-    return struct {
-        pub fn init(allocator: Allocator, n: usize) !ODE {
-            const t = 0.0;
+pub fn init(allocator: Allocator, n: usize) !ODE {
+    const t = 0.0;
 
-            const args = try allocator.alloc(Argument, 1);
-            errdefer allocator.free(args);
-            args[0] = .{ .name = "n", .value = .{ .u = n } };
+    const args = try allocator.alloc(Argument, 1);
+    errdefer allocator.free(args);
+    args[0] = .{ .name = "n", .value = .{ .u = n } };
 
-            const x_dim = n;
-            const x = try allocator.alloc(f64, x_dim);
-            errdefer allocator.free(x);
-            for (0..x_dim) |i| x[i] = 0.0;
+    const x_dim = n;
+    const x = try allocator.alloc(f64, x_dim);
+    errdefer allocator.free(x);
+    for (0..x_dim) |i| x[i] = 0.0;
 
-            const p_dim = x_dim * x_dim;
-            const p = try allocator.alloc(f64, p_dim);
-            errdefer allocator.free(p);
-            for (0..p_dim) |i| p[i] = 0.0;
+    const p_dim = x_dim * x_dim;
+    const p = try allocator.alloc(f64, p_dim);
+    errdefer allocator.free(p);
+    for (0..p_dim) |i| p[i] = 0.0;
 
+    inline for ([_]usize{ 32, 16, 8, 4, 2, 0 }) |v_len| {
+        if (n >= v_len)
             return .{
                 .allocator = allocator,
                 .args = args,
-                .x_dim = x_dim,
-                .p_dim = p_dim,
                 .t = t,
                 .x = x,
                 .p = p,
                 .vtable = &.{
                     .deinit = deinit,
-                    .calc = calc,
-                    .getT = getT,
-                    .getX = getX,
-                    .getP = getP,
-                    .setT = setT,
-                    .setX = setX,
-                    .setP = setP,
+                    .calc = calc(v_len),
                 },
             };
-        }
-        fn deinit(self: *ODE) void {
-            self.allocator.free(self.args);
-            self.allocator.free(self.x);
-            self.allocator.free(self.p);
-        }
+    }
+}
+fn deinit(self: *ODE) void {
+    self.allocator.free(self.args);
+    self.allocator.free(self.x);
+    self.allocator.free(self.p);
+}
+
+fn calc(comptime v_len: usize) fn (self: *const ODE, t: f64, x: [*]const f64, dxdt: [*]f64) void {
+    return struct {
         fn calc(self: *const ODE, t: f64, x: [*]const f64, dxdt: [*]f64) void {
             @setRuntimeSafety(false);
             @setFloatMode(.optimized);
             _ = t;
             if (comptime v_len == 0) {
-                for (0..self.x_dim) |i| {
-                    for (0..self.x_dim) |j| {
-                        dxdt[i] += self.p[i * self.x_dim + j] * x[j];
+                for (0..self.x.len) |i| {
+                    dxdt[i] = 0.0;
+                    for (0..self.x.len) |j| {
+                        dxdt[i] += self.p[i * self.x.len + j] * x[j];
                     }
                 }
             } else {
                 const V = @Vector(v_len, f64);
-                for (0..self.x_dim) |i| {
-                    const k = i * self.x_dim;
+                for (0..self.x.len) |i| {
+                    const k = i * self.x.len;
                     var tmp = @as(V, @splat(0.0));
                     var j = @as(usize, 0);
-                    while (j + v_len <= self.x_dim) : (j += v_len) {
+                    while (j + v_len <= self.x.len) : (j += v_len) {
                         tmp = @mulAdd(
                             V,
                             self.p[k + j .. k + j + v_len][0..v_len].*,
@@ -74,82 +71,63 @@ pub fn Linear(comptime v_len: usize) type {
                         );
                     }
                     dxdt[i] = @reduce(.Add, tmp);
-                    for (j..self.x_dim) |m| {
+                    for (j..self.x.len) |m| {
                         dxdt[i] += self.p[k + m] * x[m];
                     }
                 }
             }
         }
-        fn getT(self: ODE) f64 {
-            return self.t;
-        }
-        fn getX(self: ODE, i: usize) f64 {
-            return if (i < self.x_dim) self.x[i] else 0.0;
-        }
-        fn getP(self: ODE, i: usize) f64 {
-            return if (i < self.p_dim) self.p[i] else 0.0;
-        }
-        fn setT(self: *ODE, t: f64) void {
-            self.t = t;
-        }
-        fn setX(self: *ODE, x: []const f64) void {
-            for (0..self.x_dim) |i|
-                self.x[i] = if (i < x.len) x[i] else 0.0;
-        }
-        fn setP(self: *ODE, p: []const f64) void {
-            for (0..self.p_dim) |i|
-                self.p[i] = if (i < p.len) p[i] else 0.0;
-        }
-    };
+    }.calc;
 }
 
-fn init(allocator: Allocator, args: []const Argument) !ODE {
-    const n = args[0].value.u;
-    inline for ([_]usize{ 32, 16, 8, 4, 2 }) |v_len| {
-        if (n >= v_len)
-            return try Linear(v_len).init(allocator, n);
+const Factory = struct {
+    fn init(allocator: Allocator, args: []const Argument) !ODE {
+        const n = args[0].value.u;
+        return try Linear.init(allocator, n);
     }
-    return try Linear(0).init(allocator, n);
-}
-fn getArguments() []const Argument {
-    const arguments = comptime [_]Argument{.{
-        .name = "n",
-        .value = .{ .u = 2 },
-    }};
-    return &arguments;
-}
-pub const factory = ODE.Factory{
-    .vtable = &.{
-        .init = init,
-        .getArguments = getArguments,
-    },
+    fn getArguments() []const Argument {
+        return &[_]Argument{.{
+            .name = "n",
+            .value = .{ .u = 2 },
+        }};
+    }
+    fn factory() ODE.Factory {
+        return .{
+            .vtable = &.{
+                .init = Factory.init,
+                .getArguments = getArguments,
+            },
+        };
+    }
 };
+pub const factory = Factory.factory();
 
 test "factory" {
-    const n = 2;
+    const x_dim = 2;
+    const p_dim = x_dim * x_dim;
 
-    var ode = try factory.init(
+    var linear = try factory.init(
         std.testing.allocator,
         &[_]Argument{.{
             .name = "n",
-            .value = .{ .u = n },
+            .value = .{ .u = x_dim },
         }},
     );
-    defer ode.deinit();
+    defer linear.deinit();
 
     const t = @as(f64, 0.0);
-    const x = &[_]f64{ 1.0, 1.0 };
-    const p = &[_]f64{ 0.0, 1.0, -1.0, 0.0 };
-    var dxdt = [_]f64{ 0.0, 0.0 };
+    const x = &[x_dim]f64{ 1.0, 1.0 };
+    const p = &[p_dim]f64{ 0.0, 1.0, -1.0, 0.0 };
+    var dxdt = [x_dim]f64{ 0.0, 0.0 };
 
-    ode.setT(t);
-    ode.setX(x);
-    ode.setP(p);
+    linear.setT(t);
+    for (x, 0..) |x_i, i| linear.setX(i, x_i);
+    for (p, 0..) |p_i, i| linear.setP(i, p_i);
 
-    ode.calc(t, ode.x.ptr, &dxdt);
+    linear.calc(t, x.ptr, &dxdt);
 
-    try std.testing.expect(ode.x_dim == 2);
-    try std.testing.expect(ode.p_dim == 4);
+    try std.testing.expect(linear.getXDim() == x_dim);
+    try std.testing.expect(linear.getPDim() == p_dim);
     try std.testing.expect(dxdt[0] == 1.0);
     try std.testing.expect(dxdt[1] == -1.0);
 }

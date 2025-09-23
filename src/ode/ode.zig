@@ -4,14 +4,11 @@ const Argument = ds.Argument;
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
-pub const linear = @import("linear.zig");
-pub const Linear = linear.Linear;
+pub const Linear = @import("Linear.zig");
 
 pub const ODE = struct {
     allocator: Allocator,
     args: []const Argument,
-    x_dim: usize,
-    p_dim: usize,
     t: f64,
     x: []f64,
     p: []f64,
@@ -20,12 +17,6 @@ pub const ODE = struct {
     pub const VTable = struct {
         deinit: *const fn (*ODE) void,
         calc: *const fn (*const ODE, f64, [*]const f64, [*]f64) void,
-        getT: *const fn (ODE) f64,
-        getX: *const fn (ODE, usize) f64,
-        getP: *const fn (ODE, usize) f64,
-        setT: *const fn (*ODE, f64) void,
-        setX: *const fn (*ODE, []const f64) void,
-        setP: *const fn (*ODE, []const f64) void,
     };
 
     pub inline fn deinit(self: *ODE) void {
@@ -35,31 +26,36 @@ pub const ODE = struct {
         self.vtable.calc(self, t, x, dxdt);
     }
     pub inline fn getXDim(self: ODE) usize {
-        return self.x_dim;
+        return self.x.len;
     }
     pub inline fn getPDim(self: ODE) usize {
-        return self.p_dim;
+        return self.p.len;
     }
     pub inline fn getT(self: ODE) f64 {
-        return self.vtable.getT(self);
+        return self.t;
     }
     pub inline fn getX(self: ODE, i: usize) f64 {
-        return self.vtable.getX(self, i);
+        return self.x[i];
     }
     pub inline fn getP(self: ODE, i: usize) f64 {
-        return self.vtable.getP(self, i);
+        return self.p[i];
     }
     pub inline fn setT(self: *ODE, t: f64) void {
-        self.vtable.setT(self, t);
+        self.t = t;
     }
-    pub inline fn setX(self: *ODE, x: []const f64) void {
-        self.vtable.setX(self, x);
+    pub inline fn setX(self: *ODE, i: usize, x: f64) void {
+        if (i < self.x.len) self.x[i] = x;
     }
-    pub inline fn setP(self: *ODE, p: []const f64) void {
-        self.vtable.setP(self, p);
+    pub inline fn setP(self: *ODE, i: usize, p: f64) void {
+        if (i < self.p.len) self.p[i] = p;
     }
 
     pub const Factory = struct {
+        const Error = error{
+            MissingArgument,
+            InvalidArgument,
+        };
+
         vtable: *const Factory.VTable,
 
         const VTable = struct {

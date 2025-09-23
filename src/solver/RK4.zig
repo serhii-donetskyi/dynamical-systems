@@ -2,12 +2,86 @@ const ds = @import("../dynamical_systems.zig");
 const Argument = ds.Argument;
 const ODE = ds.ode.ODE;
 const Solver = ds.solver.Solver;
-const Factory = ds.solver.Solver.Factory;
 
 const std = @import("std");
 const Allocator = std.mem.Allocator;
+const RK4 = @This();
 
-pub fn RK4(comptime v_len: usize) type {
+const Data = struct {
+    allocator: Allocator,
+    capacity: usize,
+    buffer: []f64,
+    y: []f64,
+    k1: []f64,
+    k2: []f64,
+    k3: []f64,
+    k4: []f64,
+
+    pub fn init(allocator: Allocator) !Data {
+        return .{
+            .allocator = allocator,
+            .capacity = 0,
+            .buffer = try allocator.alloc(f64, 0),
+            .y = undefined,
+            .k1 = undefined,
+            .k2 = undefined,
+            .k3 = undefined,
+            .k4 = undefined,
+        };
+    }
+    pub fn ensureCapacity(self: *Data, n: usize) !void {
+        if (n <= self.capacity)
+            return;
+        self.buffer = try self.allocator.realloc(self.buffer, n * 5);
+        self.capacity = n;
+        self.y = self.buffer[0..n];
+        self.k1 = self.buffer[n .. n * 2];
+        self.k2 = self.buffer[n * 2 .. n * 3];
+        self.k3 = self.buffer[n * 3 .. n * 4];
+        self.k4 = self.buffer[n * 4 .. n * 5];
+    }
+    pub fn deinit(self: *Data) void {
+        if (self.capacity == 0)
+            return;
+        self.allocator.free(self.buffer);
+        self.capacity = 0;
+    }
+};
+
+pub fn init(allocator: Allocator, h_max: f64) !Solver {
+    const args = try allocator.alloc(Argument, 1);
+    errdefer allocator.free(args);
+    args[0] = .{ .name = "h_max", .value = .{ .f = h_max } };
+
+    const data = try allocator.create(Data);
+    errdefer allocator.destroy(data);
+    data.* = try Data.init(allocator);
+    errdefer data.deinit();
+
+    return .{
+        .allocator = allocator,
+        .args = args,
+        .dim = 0,
+        .data = data,
+        .vtable = &.{
+            .deinit = deinit,
+            .integrate = integrate(0),
+        },
+    };
+}
+fn deinit(self: *Solver) void {
+    const data: *Data = @ptrCast(@alignCast(self.data));
+    data.deinit();
+    self.allocator.free(self.args);
+    self.allocator.destroy(data);
+}
+fn integrate(comptime v_len: usize) fn (
+    self: *Solver,
+    ode: *const ODE,
+    t: *f64,
+    x: [*]f64,
+    t_end: f64,
+) anyerror!void {
     return struct {
         const T = if (v_len > 0) @Vector(v_len, f64) else f64;
         const C = @as(f64, 0.5);
@@ -17,104 +91,16 @@ pub fn RK4(comptime v_len: usize) type {
         const A_vec = if (v_len > 0) @as(T, @splat(A)) else A;
         const B_vec = if (v_len > 0) @as(T, @splat(B)) else B;
         const D_vec = if (v_len > 0) @as(T, @splat(D)) else D;
-
-        const Data = struct {
-            allocator: Allocator,
-            capacity: usize,
-            buffer: []f64,
-            y: []f64,
-            k1: []f64,
-            k2: []f64,
-            k3: []f64,
-            k4: []f64,
-
-            fn init(allocator: Allocator, n: usize) !Data {
-                if (n == 0)
-                    return .{
-                        .allocator = allocator,
-                        .capacity = 0,
-                        .buffer = undefined,
-                        .y = undefined,
-                        .k1 = undefined,
-                        .k2 = undefined,
-                        .k3 = undefined,
-                        .k4 = undefined,
-                    };
-
-                const buffer = try allocator.alloc(f64, n * 5);
-                return .{
-                    .allocator = allocator,
-                    .capacity = n,
-                    .buffer = buffer,
-                    .y = buffer[0..n],
-                    .k1 = buffer[n .. 2 * n],
-                    .k2 = buffer[2 * n .. 3 * n],
-                    .k3 = buffer[3 * n .. 4 * n],
-                    .k4 = buffer[4 * n .. 5 * n],
-                };
-            }
-
-            fn ensureCapacity(self: *Data, n: usize) !void {
-                if (n <= self.capacity)
-                    return;
-                self.deinit();
-                const buffer = try self.allocator.alloc(f64, n * 5);
-                errdefer self.allocator.free(buffer);
-                self.buffer = buffer;
-                self.capacity = n;
-                self.y = buffer[0..n];
-                self.k1 = buffer[n .. 2 * n];
-                self.k2 = buffer[2 * n .. 3 * n];
-                self.k3 = buffer[3 * n .. 4 * n];
-                self.k4 = buffer[4 * n .. 5 * n];
-            }
-
-            fn deinit(self: *Data) void {
-                if (self.capacity == 0)
-                    return;
-                self.allocator.free(self.buffer);
-                self.capacity = 0;
-            }
-        };
-
-        pub fn init(allocator: Allocator, h_max: f64) !Solver {
-            const args = try allocator.alloc(Argument, 1);
-            errdefer allocator.free(args);
-            args[0] = .{ .name = "h_max", .value = .{ .f = h_max } };
-
-            const dim = 8;
-            const data = try allocator.create(Data);
-            errdefer allocator.destroy(data);
-            data.* = try Data.init(allocator, 0);
-            errdefer data.deinit();
-
-            return .{
-                .allocator = allocator,
-                .args = args,
-                .dim = dim,
-                .data = data,
-                .vtable = &.{
-                    .deinit = deinit,
-                    .integrate = integrate,
-                },
-            };
-        }
-        fn deinit(self: *Solver) void {
-            const data: *Data = @ptrCast(@alignCast(self.data));
-            data.deinit();
-            self.allocator.destroy(data);
-            self.allocator.free(self.args);
-        }
         fn integrate(
             self: *Solver,
             ode: *const ODE,
             t: *f64,
             x: [*]f64,
             t_end: f64,
-        ) !void {
+        ) anyerror!void {
             @setRuntimeSafety(false);
             @setFloatMode(.optimized);
-            try resize(self, ode);
+            try adjust(self, ode);
             const data: *Data = @ptrCast(@alignCast(self.data));
             const sign: f64 = if (t_end > t.*) 1.0 else -1.0;
             var h = sign * self.args[0].value.f;
@@ -216,59 +202,58 @@ pub fn RK4(comptime v_len: usize) type {
                 t.* += h;
             }
         }
-        fn resize(self: *Solver, ode: *const ODE) !void {
-            if (self.dim == ode.getXDim())
-                return;
-            self.dim = ode.getXDim();
-            const data: *Data = @ptrCast(@alignCast(self.data));
-            try data.ensureCapacity(self.dim);
-            inline for ([_]usize{ 32, 16, 8, 4, 2, 0 }) |vector_len| {
-                if (vector_len >= self.dim) {
-                    var rk4 = try RK4(vector_len).init(
-                        self.allocator,
-                        self.args[0].value.f,
-                    );
-                    defer rk4.deinit();
-                    self.vtable = rk4.vtable;
-                    return;
-                }
-            }
-        }
-    };
+    }.integrate;
+}
+fn adjust(self: *Solver, ode: *const ODE) !void {
+    if (self.dim == ode.getXDim())
+        return;
+    self.dim = ode.getXDim();
+    const data: *Data = @ptrCast(@alignCast(self.data));
+    try data.ensureCapacity(self.dim);
+    inline for ([_]usize{ 32, 16, 8, 4, 2, 0 }) |v_len| {
+        if (self.dim >= v_len)
+            self.vtable = &.{
+                .deinit = deinit,
+                .integrate = integrate(v_len),
+            };
+    }
 }
 
-fn init(allocator: Allocator, args: []const Argument) !Solver {
-    const h_max = args[0].value.f;
-    inline for ([_]usize{ 32, 16, 8, 4, 2 }) |v_len| {
-        if (h_max >= v_len)
-            return try RK4(v_len).init(allocator, h_max);
+const Factory = struct {
+    fn init(allocator: Allocator, args: []const Argument) !Solver {
+        const h_max = args[0].value.f;
+        return try RK4.init(allocator, h_max);
     }
-    return try RK4(0).init(allocator, h_max);
-}
-fn getArguments() []const Argument {
-    const arguments = comptime [_]Argument{.{
-        .name = "h_max",
-        .value = .{ .f = 0.01 },
-    }};
-    return &arguments;
-}
-pub const factory = Solver.Factory{
-    .vtable = &.{
-        .init = init,
-        .getArguments = getArguments,
-    },
+    fn getArguments() []const Argument {
+        return &[_]Argument{.{
+            .name = "h_max",
+            .value = .{ .f = 0.01 },
+        }};
+    }
+    fn factory() Solver.Factory {
+        return .{
+            .vtable = &.{
+                .init = Factory.init,
+                .getArguments = getArguments,
+            },
+        };
+    }
 };
+pub const factory = Factory.factory();
 
 test "factory" {
-    var rk4 = try factory.init(
+    var solver = try factory.init(
         std.testing.allocator,
         factory.getArguments(),
     );
-    defer rk4.deinit();
+    defer solver.deinit();
 
-    for ([_]usize{ 2, 8, 16 }) |n| {
-        var linear = try ds.ode.Linear(0).init(std.testing.allocator, n);
-        defer linear.deinit();
-        try rk4.integrate(&linear, &linear.t, linear.x.ptr, linear.t + 0.1);
+    for ([_]usize{ 2, 4, 1 }) |n| {
+        var ode = try ds.ode.Linear.init(std.testing.allocator, n);
+        defer ode.deinit();
+
+        var t = ode.t;
+        const x = ode.x;
+        try solver.integrate(&ode, &t, x.ptr, t + 0.1);
     }
 }
