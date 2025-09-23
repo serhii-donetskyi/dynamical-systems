@@ -19,6 +19,7 @@ pub fn RK4(comptime v_len: usize) type {
         const D_vec = if (v_len > 0) @as(T, @splat(D)) else D;
 
         const Data = struct {
+            allocator: Allocator,
             capacity: usize,
             buffer: []f64,
             y: []f64,
@@ -27,10 +28,22 @@ pub fn RK4(comptime v_len: usize) type {
             k3: []f64,
             k4: []f64,
 
-            fn alloc(allocator: Allocator, n: usize) !Data {
-                const buffer = try allocator.alloc(f64, n * 5);
+            fn init(allocator: Allocator, n: usize) !Data {
+                if (n == 0)
+                    return .{
+                        .allocator = allocator,
+                        .capacity = 0,
+                        .buffer = undefined,
+                        .y = undefined,
+                        .k1 = undefined,
+                        .k2 = undefined,
+                        .k3 = undefined,
+                        .k4 = undefined,
+                    };
 
+                const buffer = try allocator.alloc(f64, n * 5);
                 return .{
+                    .allocator = allocator,
                     .capacity = n,
                     .buffer = buffer,
                     .y = buffer[0..n],
@@ -41,11 +54,14 @@ pub fn RK4(comptime v_len: usize) type {
                 };
             }
 
-            fn resize(self: *Data, allocator: Allocator, n: usize) !void {
-                self.free(allocator);
-                const buffer = try allocator.alloc(f64, n * 5);
-                errdefer allocator.free(buffer);
+            fn ensureCapacity(self: *Data, n: usize) !void {
+                if (n <= self.capacity)
+                    return;
+                self.deinit();
+                const buffer = try self.allocator.alloc(f64, n * 5);
+                errdefer self.allocator.free(buffer);
                 self.buffer = buffer;
+                self.capacity = n;
                 self.y = buffer[0..n];
                 self.k1 = buffer[n .. 2 * n];
                 self.k2 = buffer[2 * n .. 3 * n];
@@ -53,8 +69,10 @@ pub fn RK4(comptime v_len: usize) type {
                 self.k4 = buffer[4 * n .. 5 * n];
             }
 
-            fn free(self: *Data, allocator: Allocator) void {
-                allocator.free(self.buffer);
+            fn deinit(self: *Data) void {
+                if (self.capacity == 0)
+                    return;
+                self.allocator.free(self.buffer);
                 self.capacity = 0;
             }
         };
@@ -67,8 +85,8 @@ pub fn RK4(comptime v_len: usize) type {
             const dim = 8;
             const data = try allocator.create(Data);
             errdefer allocator.destroy(data);
-            data.* = try Data.alloc(allocator, dim);
-            errdefer data.free(allocator);
+            data.* = try Data.init(allocator, 0);
+            errdefer data.deinit();
 
             return .{
                 .allocator = allocator,
@@ -83,7 +101,7 @@ pub fn RK4(comptime v_len: usize) type {
         }
         fn deinit(self: *Solver) void {
             const data: *Data = @ptrCast(@alignCast(self.data));
-            data.free(self.allocator);
+            data.deinit();
             self.allocator.destroy(data);
             self.allocator.free(self.args);
         }
@@ -203,10 +221,7 @@ pub fn RK4(comptime v_len: usize) type {
                 return;
             self.dim = ode.getXDim();
             const data: *Data = @ptrCast(@alignCast(self.data));
-            if (data.capacity < self.dim) {
-                try data.resize(self.allocator, self.dim);
-                errdefer data.free(self.allocator);
-            }
+            try data.ensureCapacity(self.dim);
             inline for ([_]usize{ 32, 16, 8, 4, 2, 0 }) |vector_len| {
                 if (vector_len >= self.dim) {
                     var rk4 = try RK4(vector_len).init(
@@ -251,7 +266,7 @@ test "factory" {
     );
     defer rk4.deinit();
 
-    for ([_]usize{ 8, 16 }) |n| {
+    for ([_]usize{ 2, 8, 16 }) |n| {
         var linear = try ds.ode.Linear(0).init(std.testing.allocator, n);
         defer linear.deinit();
         try rk4.integrate(&linear, &linear.t, linear.x.ptr, linear.t + 0.1);
