@@ -28,10 +28,14 @@ pub const Job = struct {
 
         const VTable = struct {
             init: *const fn (Allocator, []const Argument) anyerror!Job,
+            getArguments: *const fn () []const Argument,
         };
 
         pub inline fn init(self: Factory, allocator: Allocator, args: []const Argument) anyerror!Job {
             return self.vtable.init(allocator, args);
+        }
+        pub inline fn getArguments(self: Factory) []const Argument {
+            return self.vtable.getArguments();
         }
     };
 };

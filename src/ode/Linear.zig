@@ -1,6 +1,7 @@
 const ds = @import("../dynamical_systems.zig");
 const Argument = ds.Argument;
 const ODE = ds.ode.ODE;
+const Error = ds.ode.Error;
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const Linear = @This();

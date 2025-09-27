@@ -5,6 +5,10 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 
 pub const Linear = @import("Linear.zig");
+pub const Error = error{
+    MissingArgument,
+    InvalidArgument,
+} || std.mem.Allocator.Error;
 
 pub const ODE = struct {
     allocator: Allocator,
@@ -51,19 +55,14 @@ pub const ODE = struct {
     }
 
     pub const Factory = struct {
-        const Error = error{
-            MissingArgument,
-            InvalidArgument,
-        };
-
         vtable: *const Factory.VTable,
 
         const VTable = struct {
-            init: *const fn (Allocator, []const Argument) anyerror!ODE,
+            init: *const fn (Allocator, []const Argument) Error!ODE,
             getArguments: *const fn () []const Argument,
         };
 
-        pub inline fn init(self: Factory, allocator: Allocator, args: []const Argument) anyerror!ODE {
+        pub inline fn init(self: Factory, allocator: Allocator, args: []const Argument) Error!ODE {
             return self.vtable.init(allocator, args);
         }
         pub inline fn getArguments(self: Factory) []const Argument {

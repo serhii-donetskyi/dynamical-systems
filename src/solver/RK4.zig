@@ -211,11 +211,13 @@ fn adjust(self: *Solver, ode: *const ODE) !void {
     const data: *Data = @ptrCast(@alignCast(self.data));
     try data.ensureCapacity(self.dim);
     inline for ([_]usize{ 32, 16, 8, 4, 2, 0 }) |v_len| {
-        if (self.dim >= v_len)
+        if (self.dim >= v_len) {
             self.vtable = &.{
                 .deinit = deinit,
                 .integrate = integrate(v_len),
             };
+            return;
+        }
     }
 }
 
