@@ -4,7 +4,6 @@ const Argument = ds.Argument;
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
-pub const Linear = @import("Linear.zig");
 pub const Error = error{
     MissingArgument,
     InvalidArgument,
@@ -55,6 +54,7 @@ pub const ODE = struct {
     }
 
     pub const Factory = struct {
+        name: []const u8,
         vtable: *const Factory.VTable,
 
         const VTable = struct {
@@ -70,6 +70,14 @@ pub const ODE = struct {
         }
     };
 };
+
+pub const Linear = @import("Linear.zig");
+
+pub fn list() []const ODE.Factory {
+    return &[_]ODE.Factory{
+        Linear.factory,
+    };
+}
 
 test {
     std.testing.refAllDecls(@This());

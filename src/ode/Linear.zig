@@ -94,6 +94,7 @@ const Factory = struct {
     }
     fn factory() ODE.Factory {
         return .{
+            .name = "linear",
             .vtable = &.{
                 .init = Factory.init,
                 .getArguments = getArguments,
