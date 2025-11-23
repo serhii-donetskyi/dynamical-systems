@@ -71,14 +71,8 @@ pub const ODE = struct {
     };
 };
 
-pub const Linear = @import("Linear.zig");
-
-pub fn list() []const ODE.Factory {
-    return &[_]ODE.Factory{
-        Linear.factory,
-    };
-}
+pub const Linear = @import("ode/Linear.zig");
 
 test {
-    std.testing.refAllDecls(@This());
+    _ = Linear;
 }

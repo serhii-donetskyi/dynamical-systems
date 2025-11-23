@@ -9,18 +9,19 @@ const Allocator = std.mem.Allocator;
 pub const Job = struct {
     allocator: Allocator,
     args: []const Argument,
+    data: *anyopaque,
     vtable: *const VTable,
 
     pub const VTable = struct {
         deinit: *const fn (*Job) void,
-        run: *const fn (*Job, *Solver, *const ODE) void,
+        run: *const fn (*Job, *Solver, *ODE) anyerror!void,
     };
 
     pub inline fn deinit(self: *Job) void {
         self.vtable.deinit(self);
     }
-    pub inline fn run(self: *Job, solver: *Solver, ode: *const ODE) void {
-        self.vtable.run(self, solver, ode);
+    pub inline fn run(self: *Job, solver: *Solver, ode: *ODE) anyerror!void {
+        return self.vtable.run(self, solver, ode);
     }
 
     pub const Factory = struct {
@@ -40,6 +41,8 @@ pub const Job = struct {
     };
 };
 
+pub const Portrait = @import("job/Portrait.zig");
+
 test {
-    std.testing.refAllDecls(@This());
+    _ = Portrait;
 }

@@ -5,8 +5,6 @@ const ODE = ds.ode.ODE;
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
-pub const RK4 = @import("RK4.zig");
-
 pub const Solver = struct {
     allocator: Allocator,
     args: []const Argument,
@@ -49,6 +47,8 @@ pub const Solver = struct {
     };
 };
 
+pub const RK4 = @import("solver/RK4.zig");
+
 test {
-    std.testing.refAllDecls(@This());
+    _ = RK4;
 }

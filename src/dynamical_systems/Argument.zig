@@ -3,14 +3,15 @@ const std = @import("std");
 pub const Argument = @This();
 
 pub const Value = union(enum) {
-    i: isize,
     u: usize,
+    i: isize,
     f: f64,
     s: []const u8,
 };
 
 value: Value = .{ .i = 0 },
 name: []const u8 = "",
+description: []const u8 = "",
 
 test "test argument" {
     const name = "test";

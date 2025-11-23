@@ -1,4 +1,4 @@
-const ds = @import("../dynamical_systems.zig");
+const ds = @import("../../dynamical_systems.zig");
 const Argument = ds.Argument;
 const ODE = ds.ode.ODE;
 const Error = ds.ode.Error;
