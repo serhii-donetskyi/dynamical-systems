@@ -24,7 +24,7 @@ pub fn init(allocator: Allocator, n: usize) !ODE {
     for (0..p_dim) |i| p[i] = 0.0;
 
     inline for ([_]usize{ 32, 16, 8, 4, 2, 0 }) |v_len| {
-        if (n >= v_len)
+        if (n >= 2 * v_len)
             return .{
                 .allocator = allocator,
                 .args = args,
