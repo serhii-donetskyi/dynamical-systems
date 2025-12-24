@@ -1,6 +1,6 @@
-const ds = @import("../../dynamical_systems.zig");
+const ds = @import("dynamical_systems");
 const Argument = ds.Argument;
-const ODE = ds.ode.ODE;
+const Ode = ds.ode.Ode;
 const Solver = ds.solver.Solver;
 
 const std = @import("std");
@@ -41,8 +41,6 @@ const Data = struct {
         self.k4 = self.buffer[n * 4 .. n * 5];
     }
     pub fn deinit(self: *Data) void {
-        if (self.capacity == 0)
-            return;
         self.allocator.free(self.buffer);
         self.capacity = 0;
     }
@@ -77,7 +75,7 @@ fn deinit(self: *Solver) void {
 }
 fn integrate(comptime v_len: usize) fn (
     self: *Solver,
-    ode: *const ODE,
+    ode: *const Ode,
     t: *f64,
     x: [*]f64,
     t_end: f64,
@@ -93,7 +91,7 @@ fn integrate(comptime v_len: usize) fn (
         const D_vec = if (v_len > 0) @as(T, @splat(D)) else D;
         fn integrate(
             self: *Solver,
-            ode: *const ODE,
+            ode: *const Ode,
             t: *f64,
             x: [*]f64,
             t_end: f64,
@@ -204,14 +202,14 @@ fn integrate(comptime v_len: usize) fn (
         }
     }.integrate;
 }
-fn adjust(self: *Solver, ode: *const ODE) !void {
+fn adjust(self: *Solver, ode: *const Ode) !void {
     if (self.dim == ode.getXDim())
         return;
     self.dim = ode.getXDim();
     const data: *Data = @ptrCast(@alignCast(self.data));
     try data.ensureCapacity(self.dim);
     inline for ([_]usize{ 32, 16, 8, 4, 2, 0 }) |v_len| {
-        if (self.dim >= v_len) {
+        if (self.dim >= 2 * v_len) {
             self.vtable = &.{
                 .deinit = deinit,
                 .integrate = integrate(v_len),
@@ -241,7 +239,8 @@ const Factory = struct {
         };
     }
 };
-pub const factory = Factory.factory();
+
+export const factory = &Factory.factory();
 
 test "factory" {
     var solver = try factory.init(
@@ -251,7 +250,7 @@ test "factory" {
     defer solver.deinit();
 
     for ([_]usize{ 2, 4, 1 }) |n| {
-        var ode = try ds.ode.Linear.init(std.testing.allocator, n);
+        var ode = try ds.ode.Constant.init(std.testing.allocator, n);
         defer ode.deinit();
 
         var t = ode.t;

@@ -1,12 +1,11 @@
-const ds = @import("../../dynamical_systems.zig");
+const ds = @import("dynamical_systems");
 const Argument = ds.Argument;
-const ODE = ds.ode.ODE;
-const Error = ds.ode.Error;
+const Ode = ds.ode.Ode;
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const Linear = @This();
 
-pub fn init(allocator: Allocator, n: usize) !ODE {
+pub fn init(allocator: Allocator, n: usize) !Ode {
     const t = 0.0;
 
     const args = try allocator.alloc(Argument, 1);
@@ -38,15 +37,15 @@ pub fn init(allocator: Allocator, n: usize) !ODE {
             };
     }
 }
-fn deinit(self: *ODE) void {
+fn deinit(self: *Ode) void {
     self.allocator.free(self.args);
     self.allocator.free(self.x);
     self.allocator.free(self.p);
 }
 
-fn calc(comptime v_len: usize) fn (self: *const ODE, t: f64, x: [*]const f64, dxdt: [*]f64) void {
+fn calc(comptime v_len: usize) fn (self: *const Ode, t: f64, x: [*]const f64, dxdt: [*]f64) void {
     return struct {
-        fn calc(self: *const ODE, t: f64, x: [*]const f64, dxdt: [*]f64) void {
+        fn calc(self: *const Ode, t: f64, x: [*]const f64, dxdt: [*]f64) void {
             @setRuntimeSafety(false);
             @setFloatMode(.optimized);
             _ = t;
@@ -82,7 +81,7 @@ fn calc(comptime v_len: usize) fn (self: *const ODE, t: f64, x: [*]const f64, dx
 }
 
 const Factory = struct {
-    fn init(allocator: Allocator, args: []const Argument) !ODE {
+    fn init(allocator: Allocator, args: []const Argument) !Ode {
         const n = args[0].value.u;
         return try Linear.init(allocator, n);
     }
@@ -90,11 +89,11 @@ const Factory = struct {
         return &[_]Argument{.{
             .name = "n",
             .value = .{ .u = 2 },
+            .description = "The dimension of the system",
         }};
     }
-    fn factory() ODE.Factory {
+    fn factory() Ode.Factory {
         return .{
-            .name = "linear",
             .vtable = &.{
                 .init = Factory.init,
                 .getArguments = getArguments,
@@ -102,7 +101,8 @@ const Factory = struct {
         };
     }
 };
-pub const factory = Factory.factory();
+
+export const factory = &Factory.factory();
 
 test "factory" {
     const x_dim = 2;
