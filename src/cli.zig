@@ -428,7 +428,7 @@ fn run() anyerror!void {
         for (ode_x[1..]) |arg| {
             try w.print(",{s}", .{arg});
         }
-        try w.print(").csv", .{});
+        try w.print("){s}.csv", .{job_name});
 
         file = buffer[0..w.end];
     }
