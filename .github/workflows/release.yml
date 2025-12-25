@@ -37,11 +37,12 @@ jobs:
 
     - name: zip the app
       run: |
-        (cd zig-out && zip -r ../dynamical-systems.zip .)
-        test -f dynamical-systems.zip || (echo "Zip file not found!" && exit 1)
+        (cd zig-out && zip -r ../dynamical-systems-${{ matrix.target }}.zip .)
+        test -f dynamical-systems-${{ matrix.target }}.zip || (echo "Zip file not found!" && exit 1)
 
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v4
+    - name: Upload release asset
+      uses: softprops/action-gh-release@v1
       with:
-        name: dynamical-systems-${{ matrix.target }}
-        path: dynamical-systems.zip
+        files: dynamical-systems-${{ matrix.target }}.zip
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

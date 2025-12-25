@@ -58,7 +58,9 @@ fn loadComponent(component: type) !void {
     const component_name = pair.name;
     const map = pair.map;
 
-    const bin_dir = std.fs.path.dirname(args[0]) orelse return Error.UnexpectedBinPath;
+    const bin_dir = try std.fs.selfExeDirPathAlloc(allocator);
+    defer allocator.free(bin_dir);
+
     const app_dir = std.fs.path.dirname(bin_dir) orelse return Error.UnexpectedAppPath;
 
     const lib_path = try std.fs.path.join(allocator, &.{ app_dir, "lib", component_name });
