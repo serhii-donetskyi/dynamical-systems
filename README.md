@@ -87,7 +87,6 @@ dynamical-systems/
 │   ├── cli/                   # CLI argument parsing
 │   ├── cli.zig                # CLI implementation
 │   └── main.zig               # Entry point
-├── tests/                     # Test suite
 ├── build.zig                  # Zig build configuration
 └── build.zig.zon             # Zig package manifest
 ```
