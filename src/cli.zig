@@ -302,7 +302,7 @@ fn run() anyerror!void {
                 .{ .name = "--float-precision <precision>", .description = "Float precision. Default is 5." },
                 .{ .name = "--float-mode <mode>", .description = "Float mode. Possible values are 'decimal' and 'scientific'. Default is decimal." },
                 .{ .name = "--separator <character>", .description = "Separator character. Default is space." },
-                .{ .name = "--file <path>", .description = "Output file path. Default is '<ode-name>/<job-name>.csv'. Specify '-' to output to stdout.\n" },
+                .{ .name = "--file <path>", .description = "Output file path. Default is '<ode-name>/<job-name>.txt'. Specify '-' to output to stdout.\n" },
             }) |arg| {
                 try stdout.print("  {s}{s}{s}\n", .{ arg.name, padding[0 .. padding.len - arg.name.len], arg.description });
             }
@@ -428,7 +428,7 @@ fn run() anyerror!void {
         for (ode_x[1..]) |arg| {
             try w.print(",{s}", .{arg});
         }
-        try w.print("){s}.csv", .{job_name});
+        try w.print("){s}.txt", .{job_name});
 
         file = buffer[0..w.end];
     }
