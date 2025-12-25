@@ -25,7 +25,7 @@ pub fn build(b: *std.Build) !void {
             .target = target,
             .optimize = optimize,
             // Keep release artifacts lean (esp. on Windows where this can emit .pdb).
-            .strip = true,
+            .strip = if (optimize != .Debug) true else null,
             .imports = &.{
                 .{
                     .name = "dynamical_systems",
@@ -36,7 +36,8 @@ pub fn build(b: *std.Build) !void {
     });
     const compiled_exe = b.addInstallArtifact(exe, .{
         // Prevent installing/emitting debug symbol sidecar files (e.g. .pdb on Windows).
-        .pdb_dir = .disabled,
+        .pdb_dir = if (optimize != .Debug) .disabled else .default,
+        .implib_dir = if (optimize != .Debug) .disabled else .default,
     });
     install_step.dependOn(&compiled_exe.step);
 
@@ -81,7 +82,7 @@ pub fn build(b: *std.Build) !void {
                         .target = target,
                         .optimize = optimize,
                         // Keep release artifacts lean (esp. on Windows where this can emit .pdb).
-                        .strip = true,
+                        .strip = if (optimize != .Debug) true else null,
                     }),
                 });
                 // add options to install library
@@ -89,8 +90,8 @@ pub fn build(b: *std.Build) !void {
                     .dest_dir = .{ .override = .{ .custom = "lib/" ++ dir_name } },
                     // These libraries are runtime-loaded plugins; we don't need to ship
                     // Windows import libs (.lib) or debug symbol sidecars (.pdb).
-                    .implib_dir = .disabled,
-                    .pdb_dir = .disabled,
+                    .implib_dir = if (optimize != .Debug) .disabled else .default,
+                    .pdb_dir = if (optimize != .Debug) .disabled else .default,
                 });
                 install_step.dependOn(&compiled_lib.step);
 

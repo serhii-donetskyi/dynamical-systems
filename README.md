@@ -47,7 +47,7 @@ zig-out/bin/dynamical-systems run \
   -solver rk4 \
   -solver-arg h_max=0.01 \
   -job portrait \
-  -job-arg t_step=0.1 -job-arg t_end=10.0
+  -job-arg t_step=0.1 -job-arg t_start=0.0 -job-arg t_end=10.0
 
 # List available components
 zig-out/bin/dynamical-systems list-odes

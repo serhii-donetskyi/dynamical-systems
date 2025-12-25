@@ -333,7 +333,7 @@ fn run() anyerror!void {
             try stdout.print("  -solver rk4 \\\n", .{});
             try stdout.print("  -solver-arg h_max=0.01 \\\n", .{});
             try stdout.print("  -job portrait \\\n", .{});
-            try stdout.print("  -job-arg t_step=0.1 -job-arg t_end=10.0 \n", .{});
+            try stdout.print("  -job-arg t_step=0.1 -job-arg t_start=0.0 -job-arg t_end=10.0 \n", .{});
             try stdout.print("\n", .{});
 
             return;
