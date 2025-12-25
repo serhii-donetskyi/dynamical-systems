@@ -17,6 +17,11 @@ const OdeMap = StringHashMap(*const Ode.Factory);
 const SolverMap = StringHashMap(*const Solver.Factory);
 const JobMap = StringHashMap(*const Job.Factory);
 
+const NameAndDescription = struct {
+    name: []const u8,
+    description: []const u8,
+};
+
 const Error = error{
     UnexpectedBinPath,
     UnexpectedAppPath,
@@ -139,11 +144,6 @@ fn getComponentArguments(component: type) fn () anyerror!void {
                     var buffer: [32]u8 = undefined;
                     const name = std.ascii.lowerString(buffer[0..], pair.name);
                     try stdout.print("Usage: {s} {s} <{s}-name>\n", .{ args[0], args[1], name });
-                    // try stdout.print("\n", .{});
-                    // try stdout.print("Global Options:\n", .{});
-                    // const options = "-h,  --help";
-                    // const description = "Show usage message and exit";
-                    // try stdout.print("  {s}{s}{s}\n", .{ options, padding[0 .. padding.len - options.len], description });
                     return;
                 },
                 else => return err,
@@ -178,6 +178,12 @@ fn getComponentArguments(component: type) fn () anyerror!void {
 fn createComponent(component: type, name: []const u8, cargs: []const []const u8) anyerror!component {
     const pair = getComponentPair(component);
     const factory = pair.map.get(name) orelse {
+        if (name.len == 0) {
+            var buffer: [32]u8 = undefined;
+            const cname = std.ascii.lowerString(buffer[0..], pair.name);
+            try stderr.print("Error: missing -{s} argument\n", .{cname});
+            return Error.MissingArgument;
+        }
         try stderr.print("Error: unknown {s}: '{s}'\n", .{ pair.name, name });
         return Error.UnknownComponent;
     };
@@ -285,7 +291,7 @@ fn run() anyerror!void {
             try stdout.print("\n", .{});
 
             try stdout.print("Arguments:\n", .{});
-            for ([_]struct { name: []const u8, description: []const u8 }{
+            for ([_]NameAndDescription{
                 .{ .name = "-ode <ode-name>", .description = "ODE to solve." },
                 .{ .name = "-ode-arg <name=value>", .description = "ODE argument. This is a list of 'name=value' pairs." },
                 .{ .name = "-t <float>", .description = "ODE's initial time." },
@@ -300,7 +306,7 @@ fn run() anyerror!void {
             }
 
             try stdout.print("Output Options:\n", .{});
-            for ([_]struct { name: []const u8, description: []const u8 }{
+            for ([_]NameAndDescription{
                 .{ .name = "--float-precision <precision>", .description = "Float precision. Default is 5." },
                 .{ .name = "--float-mode <mode>", .description = "Float mode. Possible values are 'decimal' and 'scientific'. Default is decimal." },
                 .{ .name = "--separator <character>", .description = "Separator character. Default is space." },
@@ -310,9 +316,11 @@ fn run() anyerror!void {
             }
 
             try stdout.print("Global Options:\n", .{});
-            const options = "-h,  --help";
-            const description = "Show usage message and exit";
-            try stdout.print("  {s}{s}{s}\n", .{ options, padding[0 .. padding.len - options.len], description });
+            for ([_]NameAndDescription{
+                .{ .name = "-h,  --help", .description = "Show usage message and exit" },
+            }) |arg| {
+                try stdout.print("  {s}{s}{s}\n", .{ arg.name, padding[0 .. padding.len - arg.name.len], arg.description });
+            }
 
             try stdout.print("\n", .{});
             try stdout.print("Usage example:\n", .{});
@@ -332,10 +340,6 @@ fn run() anyerror!void {
         },
         else => return err,
     };
-    if (ode_name.len == 0) {
-        try stderr.print("Error: missing -ode option\n", .{});
-        return Error.MissingArgument;
-    }
     var ode = try createComponent(Ode, ode_name, ode_args);
     defer ode.deinit();
     if (ode_t.len == 0) {
@@ -367,17 +371,9 @@ fn run() anyerror!void {
         });
     }
 
-    if (solver_name.len == 0) {
-        try stderr.print("Error: missing -solver option\n", .{});
-        return Error.MissingArgument;
-    }
     var solver = try createComponent(Solver, solver_name, solver_args);
     defer solver.deinit();
 
-    if (job_name.len == 0) {
-        try stderr.print("Error: missing -job option\n", .{});
-        return Error.MissingArgument;
-    }
     var job = try createComponent(Job, job_name, job_args);
     defer job.deinit();
 
@@ -448,6 +444,54 @@ fn run() anyerror!void {
     try job.run(&solver, &ode, w, job_options);
 }
 
+fn getOdeDimensions() anyerror!void {
+    const padding: [32]u8 = @splat(' ');
+
+    var ode_name: []const u8 = &.{};
+    var ode_args: []const []const u8 = &.{};
+
+    var parser = try ArgParser.init(
+        allocator,
+        &.{
+            .{ .name = "-ode", .ptr = .{ .str = &ode_name } },
+            .{ .name = "-ode-arg", .ptr = .{ .list = &ode_args } },
+        },
+    );
+    defer parser.deinit();
+
+    parser.parse(args[2..]) catch |err| switch (err) {
+        ArgParser.Error.HelpRequested => {
+            try stdout.print("Usage: {s} {s} [arguments] [options]\n", .{ args[0], args[1] });
+            try stdout.print("\n", .{});
+            try stdout.print("Arguments:\n", .{});
+            for ([_]NameAndDescription{
+                .{ .name = "-ode <ode-name>", .description = "ODE to get dimensions for." },
+                .{ .name = "-ode-arg <name=value>", .description = "ODE argument. This is a list of 'name=value' pairs.\n" },
+            }) |arg| {
+                try stdout.print("  {s}{s}{s}\n", .{ arg.name, padding[0 .. padding.len - arg.name.len], arg.description });
+            }
+
+            try stdout.print("General Options:\n", .{});
+            for ([_]NameAndDescription{
+                .{ .name = "-h,  --help", .description = "Show usage message and exit" },
+            }) |arg| {
+                try stdout.print("  {s}{s}{s}\n", .{ arg.name, padding[0 .. padding.len - arg.name.len], arg.description });
+            }
+
+            return;
+        },
+        else => return err,
+    };
+
+    var ode = try createComponent(Ode, ode_name, ode_args);
+    defer ode.deinit();
+
+    try stdout.print("Dimensions for '{s}':\n", .{ode_name});
+    try stdout.print("  phase dimension (x): {d}\n", .{ode.getXDim()});
+    try stdout.print("  parameter dimension (p): {d}\n", .{ode.getPDim()});
+    return;
+}
+
 fn loadCommands() !void {
     try commands.put("list-odes", listComponents(Ode));
     try commands.put("list-solvers", listComponents(Solver));
@@ -456,14 +500,10 @@ fn loadCommands() !void {
     try commands.put("get-solver-args", getComponentArguments(Solver));
     try commands.put("get-job-args", getComponentArguments(Job));
     try commands.put("run", run);
+    try commands.put("get-ode-dimensions", getOdeDimensions);
 }
 
 fn printUsage() !void {
-    const CommandAndDescription = struct {
-        command: []const u8,
-        description: []const u8 = "",
-    };
-
     const padding: [32]u8 = @splat(' ');
 
     try stdout.print("Usage: {s} <command> [options]\n", .{args[0]});
@@ -471,22 +511,25 @@ fn printUsage() !void {
 
     try stdout.print("Commands:\n", .{});
 
-    for ([_]CommandAndDescription{
-        .{ .command = "run", .description = "Run a dynamical system simulation\n" },
-        .{ .command = "list-odes", .description = "List available ODEs" },
-        .{ .command = "list-solvers", .description = "List available solvers" },
-        .{ .command = "list-jobs", .description = "List available jobs\n" },
-        .{ .command = "get-ode-args", .description = "Get arguments for an ODE" },
-        .{ .command = "get-solver-args", .description = "Get arguments for a solver" },
-        .{ .command = "get-job-args", .description = "Get arguments for a job\n" },
+    for ([_]NameAndDescription{
+        .{ .name = "run", .description = "Run a dynamical system simulation\n" },
+        .{ .name = "get-ode-dimensions", .description = "Get dimensions for an ODE\n" },
+        .{ .name = "list-odes", .description = "List available ODEs" },
+        .{ .name = "list-solvers", .description = "List available solvers" },
+        .{ .name = "list-jobs", .description = "List available jobs\n" },
+        .{ .name = "get-ode-args", .description = "Get arguments for an ODE" },
+        .{ .name = "get-solver-args", .description = "Get arguments for a solver" },
+        .{ .name = "get-job-args", .description = "Get arguments for a job\n" },
     }) |cnd| {
-        try stdout.print("  {s}{s}{s}\n", .{ cnd.command, padding[0 .. padding.len - cnd.command.len], cnd.description });
+        try stdout.print("  {s}{s}{s}\n", .{ cnd.name, padding[0 .. padding.len - cnd.name.len], cnd.description });
     }
 
     try stdout.print("General Options:\n", .{});
-    const options = "-h,  --help";
-    const description = "Show usage message and exit";
-    try stdout.print("  {s}{s}{s}\n", .{ options, padding[0 .. padding.len - options.len], description });
+    for ([_]NameAndDescription{
+        .{ .name = "-h,  --help", .description = "Show usage message and exit" },
+    }) |arg| {
+        try stdout.print("  {s}{s}{s}\n", .{ arg.name, padding[0 .. padding.len - arg.name.len], arg.description });
+    }
 }
 
 pub fn main() !void {
