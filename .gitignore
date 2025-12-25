@@ -28,3 +28,7 @@ htmlcov*
 # calculations
 *.csv
 *.txt
+
+# zig
+.zig-cache*
+zig-out*
