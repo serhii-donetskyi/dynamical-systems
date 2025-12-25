@@ -23,10 +23,8 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Setup Zig compiler
-      # Use a specific version tag instead of @main for stability
       uses: mlugg/setup-zig@main
       with:
-        # Optional: Specify a version, e.g., '0.15.2', 'master', or omit for the latest release
         version: 0.15.2
 
     - name: Run tests
@@ -34,6 +32,21 @@ jobs:
 
     - name: Build project
       run: zig build --release=fast -Doptimize=ReleaseFast
+
+  release:
+    needs: build-and-test  # This job waits for build-and-test to complete successfully
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    # Download the artifacts from build-and-test job
+    - name: Download build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: zig-out
+        path: zig-out/
 
     - name: zip the app
       run: |
