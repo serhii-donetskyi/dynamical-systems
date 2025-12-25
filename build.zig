@@ -19,7 +19,7 @@ pub fn build(b: *std.Build) !void {
 
     // compile the executable
     const exe = b.addExecutable(.{
-        .name = "dynamical_systems",
+        .name = "dynamical-systems",
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/main.zig"),
             .target = target,
