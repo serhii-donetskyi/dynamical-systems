@@ -96,7 +96,7 @@ const Factory = struct {
 export const factory = &Factory.factory();
 
 test "portrait" {
-    var job = try Portrait.init(std.testing.allocator, 0.1, 0.0, 1.0);
+    var job = try Portrait.init(std.testing.allocator, 0.1, 0.0, 0.1);
     defer job.deinit();
 
     var solver = try ds.solver.Euler.init(std.testing.allocator, 0.01);
