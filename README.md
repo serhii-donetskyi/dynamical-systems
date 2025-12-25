@@ -31,7 +31,6 @@ xattr -rd com.apple.quarantine zig-out
 ## Requirements
 
 - Zig compiler (0.15.1+)
-- C compiler (GCC/Clang) for linking
 
 ## Quick Start
 
