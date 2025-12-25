@@ -52,8 +52,6 @@ fn getComponentPair(component: type) struct { name: []const u8, map: *StringHash
 }
 
 fn loadComponent(component: type) !void {
-    const cwd = std.fs.cwd();
-
     const pair = getComponentPair(component);
     const component_name = pair.name;
     const map = pair.map;
@@ -66,7 +64,7 @@ fn loadComponent(component: type) !void {
     const lib_path = try std.fs.path.join(allocator, &.{ app_dir, "lib", component_name });
     defer allocator.free(lib_path);
 
-    var dir = cwd.openDir(lib_path, .{}) catch |err| {
+    var dir = std.fs.openDirAbsolute(lib_path, .{}) catch |err| {
         try stderr.print("Error opening directory '{s}': {s}\n", .{ lib_path, @errorName(err) });
         return;
     };
