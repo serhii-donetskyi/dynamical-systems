@@ -29,6 +29,7 @@ htmlcov*
 # calculations
 *.csv
 *.txt
+tmp
 
 # zig
 .zig-cache*

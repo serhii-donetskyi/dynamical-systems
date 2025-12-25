@@ -65,8 +65,8 @@ fn calc(comptime v_len: usize) fn (self: *const Ode, t: f64, x: [*]const f64, dx
                     while (j + v_len <= self.x.len) : (j += v_len) {
                         tmp = @mulAdd(
                             V,
-                            self.p[k + j .. k + j + v_len][0..v_len].*,
-                            x[j .. j + v_len][0..v_len].*,
+                            self.p[k + j ..][0..v_len].*,
+                            x[j..][0..v_len].*,
                             tmp,
                         );
                     }

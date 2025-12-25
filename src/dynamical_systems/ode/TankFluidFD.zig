@@ -17,7 +17,7 @@ pub fn init(allocator: Allocator, m: usize) anyerror!Ode {
     errdefer allocator.free(x);
     for (0..x_dim) |i| x[i] = 0.0;
 
-    const p_dim = 7;
+    const p_dim = 8;
     const p = try allocator.alloc(f64, p_dim);
     errdefer allocator.free(p);
     for (0..p_dim) |i| p[i] = 0.0;
@@ -69,25 +69,29 @@ pub fn calc(comptime v_len: usize) fn (self: *const Ode, t: f64, x: [*]const f64
                 dxdt[3] = self.p[0] * x[3] - tmp1 * x[4] - tmp2 * x[0];
                 dxdt[4] = self.p[0] * x[4] + tmp1 * x[3] - tmp2 * x[1];
 
-                const coef = @as(f64, @floatFromInt(m)) / self.p[6];
-                dxdt[5] = coef * (x[1] - x[5]);
-                dxdt[6] = coef * (x[3] - x[6]);
+                const delta_coef = @as(f64, @floatFromInt(m)) / self.p[6];
+                const rho_coef = @as(f64, @floatFromInt(m)) / self.p[7];
+                dxdt[5] = delta_coef * (x[1] - x[5]);
+                dxdt[6] = rho_coef * (x[3] - x[6]);
 
                 if (comptime v_len == 0) {
                     for (1..m) |i| {
                         const idx = 5 + 2 * i;
-                        dxdt[idx] = coef * (x[idx - 2] - x[idx]);
-                        dxdt[idx + 1] = coef * (x[idx - 1] - x[idx + 1]);
+                        dxdt[idx] = delta_coef * (x[idx - 2] - x[idx]);
+                        dxdt[idx + 1] = rho_coef * (x[idx - 1] - x[idx + 1]);
                     }
                 } else {
                     const V = @Vector(v_len, f64);
 
-                    const coef_vec = @as(V, @splat(coef));
+                    const coef_vec: V = blk: {
+                        const tmp = .{ delta_coef, rho_coef } ** (v_len / 2);
+                        break :blk tmp;
+                    };
                     var i = @as(usize, 7);
                     while (i < self.x.len) : (i += v_len) {
-                        const v1 = @as(V, x[i .. i + v_len][0..v_len].*);
-                        const v2 = @as(V, x[i - 2 .. i - 2 + v_len][0..v_len].*);
-                        dxdt[i .. i + v_len][0..v_len].* = coef_vec * (v1 - v2);
+                        const v1 = @as(V, x[i..][0..v_len].*);
+                        const v2 = @as(V, x[i - 2 ..][0..v_len].*);
+                        dxdt[i..][0..v_len].* = coef_vec * (v1 - v2);
                     }
                 }
             }
