@@ -23,7 +23,9 @@ repos:
         name: Build and test
         entry: zig build test
         language: system
+        pass_filenames: false
       - id: zig-build
         name: Build the app with release mode
         entry: zig build --release=fast -Doptimize=ReleaseFast
         language: system
+        pass_filenames: false
