@@ -23,6 +23,11 @@ zig build --release=fast -Doptimize=ReleaseFast
 
 The executable will be installed to `zig-out/bin/dynamical-systems`.
 
+**Note for macOS users:** If you encounter a security warning when running the executable, remove the quarantine attribute:
+```bash
+xattr -rd com.apple.quarantine zig-out
+```
+
 ## Requirements
 
 - Zig compiler (0.15.1+)
