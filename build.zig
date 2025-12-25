@@ -53,7 +53,7 @@ pub fn build(b: *std.Build) !void {
     const cwd = std.fs.cwd();
     inline for ([_][]const u8{ "job", "solver", "ode" }) |dir_name| {
         const dir_path = "src/dynamical_systems/" ++ dir_name;
-        var dir = try cwd.openDir(dir_path, .{});
+        var dir = try cwd.openDir(dir_path, .{ .iterate = true });
         defer dir.close();
 
         var iter = dir.iterate();
