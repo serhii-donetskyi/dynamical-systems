@@ -24,6 +24,8 @@ pub fn build(b: *std.Build) !void {
             .root_source_file = b.path("src/main.zig"),
             .target = target,
             .optimize = optimize,
+            // Keep release artifacts lean (esp. on Windows where this can emit .pdb).
+            .strip = true,
             .imports = &.{
                 .{
                     .name = "dynamical_systems",
@@ -32,7 +34,10 @@ pub fn build(b: *std.Build) !void {
             },
         }),
     });
-    const compiled_exe = b.addInstallArtifact(exe, .{});
+    const compiled_exe = b.addInstallArtifact(exe, .{
+        // Prevent installing/emitting debug symbol sidecar files (e.g. .pdb on Windows).
+        .pdb_dir = .disabled,
+    });
     install_step.dependOn(&compiled_exe.step);
 
     // compile executable for tests
@@ -75,11 +80,17 @@ pub fn build(b: *std.Build) !void {
                         },
                         .target = target,
                         .optimize = optimize,
+                        // Keep release artifacts lean (esp. on Windows where this can emit .pdb).
+                        .strip = true,
                     }),
                 });
                 // add options to install library
                 const compiled_lib = b.addInstallArtifact(lib, .{
                     .dest_dir = .{ .override = .{ .custom = "lib/" ++ dir_name } },
+                    // These libraries are runtime-loaded plugins; we don't need to ship
+                    // Windows import libs (.lib) or debug symbol sidecars (.pdb).
+                    .implib_dir = .disabled,
+                    .pdb_dir = .disabled,
                 });
                 install_step.dependOn(&compiled_lib.step);
 
