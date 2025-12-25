@@ -1,10 +1,6 @@
 name: Build and Test
 
 on:
-  push:
-    branches:
-      - main
-  pull_request:
   release:
     types: [published]
 
@@ -16,8 +12,14 @@ permissions:
   contents: write  # Required for uploading release assets
 
 jobs:
-  build-and-test:
-    runs-on: ubuntu-latest # Or windows-latest, macos-latest
+  release:
+    strategy:
+      matrix:
+        target:
+          - x86_64-windows
+          - x86_64-linux
+          - aarch64-macos
+    runs-on: ubuntu-latest
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
@@ -31,22 +33,7 @@ jobs:
       run: zig build test
 
     - name: Build project
-      run: zig build --release=fast -Doptimize=ReleaseFast
-
-  release:
-    needs: build-and-test  # This job waits for build-and-test to complete successfully
-    if: github.event_name == 'release'
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-
-    # Download the artifacts from build-and-test job
-    - name: Download build artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: zig-out
-        path: zig-out/
+      run: zig build --release=fast -Doptimize=ReleaseFast -Dtarget=${{ matrix.target }}
 
     - name: zip the app
       run: |
@@ -56,5 +43,5 @@ jobs:
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: dynamical-systems
+        name: dynamical-systems-${{ matrix.target }}
         path: dynamical-systems.zip
