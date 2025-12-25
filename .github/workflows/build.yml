@@ -27,7 +27,7 @@ jobs:
       uses: mlugg/setup-zig@main
       with:
         # Optional: Specify a version, e.g., '0.15.2', 'master', or omit for the latest release
-        zig-version: 0.15.2
+        version: 0.15.2
 
     - name: Run tests
       run: zig build test
