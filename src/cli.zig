@@ -9,6 +9,7 @@ const Ode = ds.ode.Ode;
 const Solver = ds.solver.Solver;
 const Job = ds.job.Job;
 
+const DynLibs = std.ArrayList(DynLib);
 const ArgumentMap = StringHashMap(*ds.Argument);
 
 const CommandMap = StringHashMap(*const fn () anyerror!void);
@@ -33,6 +34,7 @@ var allocator: std.mem.Allocator = undefined;
 var stdout: *std.Io.Writer = undefined;
 var stderr: *std.Io.Writer = undefined;
 
+var dyn_libs: DynLibs = undefined;
 var args: []const []const u8 = undefined;
 
 var commands: CommandMap = undefined;
@@ -78,7 +80,7 @@ fn loadComponent(component: type) !void {
                 try stderr.print("Error loading {s} library '{s}': {s}\n", .{ component_name, entry.name, @errorName(err) });
                 return;
             };
-            defer lib.close();
+            try dyn_libs.append(allocator, lib);
 
             const factory_ = lib.lookup(*const *const component.Factory, "factory");
             if (factory_) |factory| {
@@ -514,6 +516,14 @@ pub fn main() !void {
         try arg_list.append(allocator, arg);
     }
     args = arg_list.items;
+
+    dyn_libs = try DynLibs.initCapacity(allocator, 8);
+    defer {
+        for (dyn_libs.items) |*lib| {
+            lib.close();
+        }
+        dyn_libs.deinit(allocator);
+    }
 
     commands = CommandMap.init(allocator);
     defer commands.deinit();
