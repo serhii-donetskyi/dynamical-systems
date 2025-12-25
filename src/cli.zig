@@ -61,11 +61,11 @@ fn loadComponent(component: type) !void {
 
     const app_dir = std.fs.path.dirname(bin_dir) orelse return Error.UnexpectedAppPath;
 
-    const lib_path = try std.fs.path.join(allocator, &.{ app_dir, "lib", component_name });
-    defer allocator.free(lib_path);
+    const lib_dir = try std.fs.path.join(allocator, &.{ app_dir, "lib", component_name });
+    defer allocator.free(lib_dir);
 
-    var dir = std.fs.openDirAbsolute(lib_path, .{}) catch |err| {
-        try stderr.print("Error opening directory '{s}': {s}\n", .{ lib_path, @errorName(err) });
+    var dir = std.fs.openDirAbsolute(lib_dir, .{ .iterate = true }) catch |err| {
+        try stderr.print("Error opening directory '{s}': {s}\n", .{ lib_dir, @errorName(err) });
         return;
     };
     defer dir.close();
@@ -73,7 +73,7 @@ fn loadComponent(component: type) !void {
     var iter = dir.iterate();
     while (try iter.next()) |entry| {
         if (entry.kind == .file) {
-            const file_path = try std.fs.path.join(allocator, &.{ lib_path, entry.name });
+            const file_path = try std.fs.path.join(allocator, &.{ lib_dir, entry.name });
             defer allocator.free(file_path);
 
             var lib = DynLib.open(file_path) catch |err| {
