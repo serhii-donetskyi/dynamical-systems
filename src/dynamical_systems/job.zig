@@ -12,8 +12,6 @@ pub const Job = struct {
         float: std.fmt.float.Options,
     };
 
-    allocator: Allocator,
-    args: []const Argument,
     data: *anyopaque,
     vtable: *const VTable,
 
@@ -47,15 +45,19 @@ pub const Job = struct {
 };
 
 pub const Skip = struct {
+    const Data = struct {
+        allocator: Allocator,
+        t_end: f64,
+    };
     pub fn init(allocator: Allocator, t_end: f64) !Job {
-        const args = try allocator.alloc(Argument, 1);
-        errdefer allocator.free(args);
-        args[0] = .{ .name = "t_end", .value = .{ .f = t_end } };
-
-        return .{
+        const data = try allocator.create(Data);
+        errdefer allocator.destroy(data);
+        data.* = .{
             .allocator = allocator,
-            .args = args,
-            .data = undefined,
+            .t_end = t_end,
+        };
+        return .{
+            .data = data,
             .vtable = &.{
                 .deinit = deinit,
                 .run = run,
@@ -64,17 +66,19 @@ pub const Skip = struct {
     }
 
     pub fn deinit(self: *Job) void {
-        self.allocator.free(self.args);
+        const data: *Data = @ptrCast(@alignCast(self.data));
+        data.allocator.destroy(data);
     }
 
     pub fn run(self: *Job, solver: *Solver, ode: *Ode, w: *std.io.Writer, options: Job.Options) anyerror!void {
         _ = w;
         _ = options;
-        const t_end = self.args[0].value.f;
+        const data: *Data = @ptrCast(@alignCast(self.data));
+        const t_end = data.t_end;
 
         var t = ode.getT();
-        const x = try self.allocator.alloc(f64, ode.getXDim());
-        defer self.allocator.free(x);
+        const x = try data.allocator.alloc(f64, ode.getXDim());
+        defer data.allocator.free(x);
         for (0..ode.getXDim()) |i| {
             x[i] = ode.getX(i);
         }

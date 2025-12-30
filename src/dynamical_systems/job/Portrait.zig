@@ -7,18 +7,25 @@ const Job = ds.job.Job;
 const Allocator = std.mem.Allocator;
 const Portrait = @This();
 
-pub fn init(allocator: Allocator, t_step: f64, t_start: f64, t_end: f64) !Job {
-    const args = try allocator.alloc(Argument, 3);
-    errdefer allocator.free(args);
+const Data = struct {
+    allocator: Allocator,
+    t_step: f64,
+    t_start: f64,
+    t_end: f64,
+};
 
-    args[0] = .{ .name = "t_step", .value = .{ .f = t_step } };
-    args[1] = .{ .name = "t_start", .value = .{ .f = t_start } };
-    args[2] = .{ .name = "t_end", .value = .{ .f = t_end } };
+pub fn init(allocator: Allocator, t_step: f64, t_start: f64, t_end: f64) !Job {
+    const data = try allocator.create(Data);
+    errdefer allocator.destroy(data);
+    data.* = .{
+        .allocator = allocator,
+        .t_step = t_step,
+        .t_start = t_start,
+        .t_end = t_end,
+    };
 
     return .{
-        .allocator = allocator,
-        .args = args,
-        .data = undefined,
+        .data = data,
         .vtable = &.{
             .deinit = deinit,
             .run = run,
@@ -27,14 +34,16 @@ pub fn init(allocator: Allocator, t_step: f64, t_start: f64, t_end: f64) !Job {
 }
 
 pub fn deinit(self: *Job) void {
-    self.allocator.free(self.args);
+    const data: *Data = @ptrCast(@alignCast(self.data));
+    data.allocator.destroy(data);
 }
 
 pub fn run(self: *Job, solver: *Solver, ode: *Ode, w: *std.io.Writer, options: Job.Options) !void {
     var buf: [128]u8 = undefined;
-    const t_step = self.args[0].value.f;
-    const t_start = self.args[1].value.f;
-    const t_end = self.args[2].value.f;
+    const data: *Data = @ptrCast(@alignCast(self.data));
+    const t_step = data.t_step;
+    const t_start = data.t_start;
+    const t_end = data.t_end;
 
     try w.print("t", .{});
     const x_dim = ode.getXDim();
@@ -46,8 +55,8 @@ pub fn run(self: *Job, solver: *Solver, ode: *Ode, w: *std.io.Writer, options: J
 
     var t = ode.getT();
 
-    const x = try self.allocator.alloc(f64, x_dim);
-    defer self.allocator.free(x);
+    const x = try data.allocator.alloc(f64, x_dim);
+    defer data.allocator.free(x);
     for (0..x_dim) |i| {
         x[i] = ode.getX(i);
     }
