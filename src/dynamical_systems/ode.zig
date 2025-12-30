@@ -5,16 +5,15 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 
 pub const Ode = struct {
-    allocator: Allocator,
-    args: []const Argument,
-    t: f64,
-    x: []f64,
-    p: []f64,
+    data: *anyopaque,
     vtable: *const VTable,
 
     pub const VTable = struct {
         deinit: *const fn (*Ode) void,
         calc: *const fn (*const Ode, f64, [*]const f64, [*]f64) void,
+        getT: *const fn (*const Ode) *f64,
+        getX: *const fn (*const Ode) []f64,
+        getP: *const fn (*const Ode) []f64,
     };
 
     pub inline fn deinit(self: *Ode) void {
@@ -23,29 +22,33 @@ pub const Ode = struct {
     pub inline fn calc(self: *const Ode, t: f64, x: [*]const f64, dxdt: [*]f64) void {
         self.vtable.calc(self, t, x, dxdt);
     }
-    pub inline fn getXDim(self: Ode) usize {
-        return self.x.len;
+    pub inline fn getXDim(self: *const Ode) usize {
+        return self.vtable.getX(self).len;
     }
-    pub inline fn getPDim(self: Ode) usize {
-        return self.p.len;
+    pub inline fn getPDim(self: *const Ode) usize {
+        return self.vtable.getP(self).len;
     }
-    pub inline fn getT(self: Ode) f64 {
-        return self.t;
+    pub inline fn getT(self: *const Ode) f64 {
+        return self.vtable.getT(self).*;
     }
-    pub inline fn getX(self: Ode, i: usize) f64 {
-        return self.x[i];
+    pub inline fn getX(self: *const Ode, i: usize) f64 {
+        const x = self.vtable.getX(self);
+        return if (i < x.len) x[i] else 0.0;
     }
-    pub inline fn getP(self: Ode, i: usize) f64 {
-        return self.p[i];
+    pub inline fn getP(self: *const Ode, i: usize) f64 {
+        const p = self.vtable.getP(self);
+        return if (i < p.len) p[i] else 0.0;
     }
     pub inline fn setT(self: *Ode, t: f64) void {
-        self.t = t;
+        self.vtable.getT(self).* = t;
     }
-    pub inline fn setX(self: *Ode, i: usize, x: f64) void {
-        if (i < self.x.len) self.x[i] = x;
+    pub inline fn setX(self: *Ode, i: usize, value: f64) void {
+        const x = self.vtable.getX(self);
+        if (i < x.len) x[i] = value;
     }
-    pub inline fn setP(self: *Ode, i: usize, p: f64) void {
-        if (i < self.p.len) self.p[i] = p;
+    pub inline fn setP(self: *Ode, i: usize, value: f64) void {
+        const p = self.vtable.getP(self);
+        if (i < p.len) p[i] = value;
     }
 
     pub const Factory = struct {
@@ -74,42 +77,61 @@ pub const Ode = struct {
 };
 
 pub const Constant = struct {
+    const Data = struct {
+        allocator: Allocator,
+        n: usize,
+        t: f64,
+        x: []f64,
+    };
+
     pub fn init(allocator: Allocator, n: usize) !Ode {
-        const args = try allocator.alloc(Argument, 1);
-        errdefer allocator.free(args);
-        args[0] = .{ .name = "n", .value = .{ .u = n } };
-
-        const x = try allocator.alloc(f64, n);
-        errdefer allocator.free(x);
-
-        const p = try allocator.alloc(f64, 0);
-        errdefer allocator.free(p);
+        const data = try allocator.create(Data);
+        errdefer allocator.destroy(data);
+        data.* = .{
+            .allocator = allocator,
+            .n = n,
+            .t = 0.0,
+            .x = try allocator.alloc(f64, n),
+        };
 
         return .{
-            .allocator = allocator,
-            .args = args,
-            .t = 0.0,
-            .x = x,
-            .p = p,
+            .data = data,
             .vtable = &.{
                 .deinit = deinit,
                 .calc = calc,
+                .getT = getT,
+                .getX = getX,
+                .getP = getP,
             },
         };
     }
 
-    pub fn deinit(self: *Ode) void {
-        self.allocator.free(self.p);
-        self.allocator.free(self.x);
-        self.allocator.free(self.args);
+    fn deinit(self: *Ode) void {
+        const data: *Data = @ptrCast(@alignCast(self.data));
+        data.allocator.free(data.x);
+        data.allocator.destroy(data);
     }
 
-    pub fn calc(self: *const Ode, t: f64, x: [*]const f64, dxdt: [*]f64) void {
+    fn calc(self: *const Ode, t: f64, x: [*]const f64, dxdt: [*]f64) void {
         _ = t;
         _ = x;
-        for (0..self.x.len) |i| {
+        const data: *Data = @ptrCast(@alignCast(self.data));
+        for (0..data.n) |i| {
             dxdt[i] = 0;
         }
+    }
+
+    fn getT(self: *const Ode) *f64 {
+        const data: *Data = @ptrCast(@alignCast(self.data));
+        return &data.t;
+    }
+    fn getX(self: *const Ode) []f64 {
+        const data: *Data = @ptrCast(@alignCast(self.data));
+        return data.x;
+    }
+    fn getP(self: *const Ode) []f64 {
+        _ = self;
+        return &[_]f64{};
     }
 
     pub const Factory = struct {

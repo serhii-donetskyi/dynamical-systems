@@ -9,57 +9,31 @@ const RK4 = @This();
 
 const Data = struct {
     allocator: Allocator,
-    capacity: usize,
-    buffer: []f64,
+    h_max: f64,
     y: []f64,
     k1: []f64,
     k2: []f64,
     k3: []f64,
     k4: []f64,
-
-    pub fn init(allocator: Allocator) !Data {
-        return .{
-            .allocator = allocator,
-            .capacity = 0,
-            .buffer = try allocator.alloc(f64, 0),
-            .y = undefined,
-            .k1 = undefined,
-            .k2 = undefined,
-            .k3 = undefined,
-            .k4 = undefined,
-        };
-    }
-    pub fn ensureCapacity(self: *Data, n: usize) !void {
-        if (n <= self.capacity)
-            return;
-        self.buffer = try self.allocator.realloc(self.buffer, n * 5);
-        self.capacity = n;
-        self.y = self.buffer[0..n];
-        self.k1 = self.buffer[n .. n * 2];
-        self.k2 = self.buffer[n * 2 .. n * 3];
-        self.k3 = self.buffer[n * 3 .. n * 4];
-        self.k4 = self.buffer[n * 4 .. n * 5];
-    }
-    pub fn deinit(self: *Data) void {
-        self.allocator.free(self.buffer);
-        self.capacity = 0;
-    }
 };
 
 pub fn init(allocator: Allocator, h_max: f64) !Solver {
-    const args = try allocator.alloc(Argument, 1);
-    errdefer allocator.free(args);
-    args[0] = .{ .name = "h_max", .value = .{ .f = h_max } };
-
     const data = try allocator.create(Data);
     errdefer allocator.destroy(data);
-    data.* = try Data.init(allocator);
-    errdefer data.deinit();
+
+    const y = try allocator.alloc(f64, 0);
+    errdefer allocator.free(y);
+    data.* = .{
+        .allocator = allocator,
+        .h_max = h_max,
+        .y = y,
+        .k1 = y[0..0],
+        .k2 = y[0..0],
+        .k3 = y[0..0],
+        .k4 = y[0..0],
+    };
 
     return .{
-        .allocator = allocator,
-        .args = args,
-        .dim = 0,
         .data = data,
         .vtable = &.{
             .deinit = deinit,
@@ -67,12 +41,13 @@ pub fn init(allocator: Allocator, h_max: f64) !Solver {
         },
     };
 }
+
 fn deinit(self: *Solver) void {
     const data: *Data = @ptrCast(@alignCast(self.data));
-    data.deinit();
-    self.allocator.free(self.args);
-    self.allocator.destroy(data);
+    data.allocator.free(data.y);
+    data.allocator.destroy(data);
 }
+
 fn integrate(comptime v_len: usize) fn (
     self: *Solver,
     ode: *const Ode,
@@ -98,10 +73,18 @@ fn integrate(comptime v_len: usize) fn (
         ) anyerror!void {
             @setRuntimeSafety(false);
             @setFloatMode(.optimized);
-            try adjust(self, ode);
+
             const data: *Data = @ptrCast(@alignCast(self.data));
+            const x_dim = ode.getXDim();
+            if (data.y.len < x_dim) {
+                data.y = try data.allocator.realloc(data.y, x_dim * 5);
+                data.k1 = data.y[x_dim .. x_dim * 2];
+                data.k2 = data.y[x_dim * 2 .. x_dim * 3];
+                data.k3 = data.y[x_dim * 3 .. x_dim * 4];
+                data.k4 = data.y[x_dim * 4 .. x_dim * 5];
+            }
             const sign: f64 = if (t_end > t.*) 1.0 else -1.0;
-            var h = sign * self.args[0].value.f;
+            var h = sign * data.h_max;
             var h_vec: T = if (v_len > 0) @splat(h) else h;
 
             for (0..1_000_000_000) |_| {
@@ -114,7 +97,7 @@ fn integrate(comptime v_len: usize) fn (
                 ode.calc(t.*, x, data.k1.ptr);
                 if (comptime v_len > 0) {
                     var j = @as(usize, 0);
-                    while (j + v_len <= self.dim) : (j += v_len) {
+                    while (j + v_len <= x_dim) : (j += v_len) {
                         data.y[j..][0..v_len].* = @mulAdd(
                             T,
                             A_vec * h_vec,
@@ -122,18 +105,18 @@ fn integrate(comptime v_len: usize) fn (
                             x[j..][0..v_len].*,
                         );
                     }
-                    for (j..self.dim) |i| {
+                    for (j..x_dim) |i| {
                         data.y[i] = x[i] + A * h * data.k1[i];
                     }
                 } else {
-                    for (0..self.dim) |i| {
+                    for (0..x_dim) |i| {
                         data.y[i] = x[i] + A * h * data.k1[i];
                     }
                 }
                 ode.calc(t.* + h * C, data.y.ptr, data.k2.ptr);
                 if (comptime v_len > 0) {
                     var j = @as(usize, 0);
-                    while (j + v_len <= self.dim) : (j += v_len) {
+                    while (j + v_len <= x_dim) : (j += v_len) {
                         data.y[j..][0..v_len].* = @mulAdd(
                             T,
                             A_vec * h_vec,
@@ -141,18 +124,18 @@ fn integrate(comptime v_len: usize) fn (
                             x[j..][0..v_len].*,
                         );
                     }
-                    for (j..self.dim) |i| {
+                    for (j..x_dim) |i| {
                         data.y[i] = x[i] + A * h * data.k2[i];
                     }
                 } else {
-                    for (0..self.dim) |i| {
+                    for (0..x_dim) |i| {
                         data.y[i] = x[i] + A * h * data.k2[i];
                     }
                 }
                 ode.calc(t.* + h * C, data.y.ptr, data.k3.ptr);
                 if (comptime v_len > 0) {
                     var j = @as(usize, 0);
-                    while (j + v_len <= self.dim) : (j += v_len) {
+                    while (j + v_len <= x_dim) : (j += v_len) {
                         data.y[j..][0..v_len].* = @mulAdd(
                             T,
                             h_vec,
@@ -160,18 +143,18 @@ fn integrate(comptime v_len: usize) fn (
                             x[j..][0..v_len].*,
                         );
                     }
-                    for (j..self.dim) |i| {
+                    for (j..x_dim) |i| {
                         data.y[i] = x[i] + h * data.k3[i];
                     }
                 } else {
-                    for (0..self.dim) |i| {
+                    for (0..x_dim) |i| {
                         data.y[i] = x[i] + h * data.k3[i];
                     }
                 }
                 ode.calc(t.* + h, data.y.ptr, data.k4.ptr);
                 if (comptime v_len > 0) {
                     var j = @as(usize, 0);
-                    while (j + v_len <= self.dim) : (j += v_len) {
+                    while (j + v_len <= x_dim) : (j += v_len) {
                         x[j..][0..v_len].* = @mulAdd(
                             T,
                             h_vec * D_vec,
@@ -189,11 +172,11 @@ fn integrate(comptime v_len: usize) fn (
                             x[j..][0..v_len].*,
                         );
                     }
-                    for (j..self.dim) |i| {
+                    for (j..x_dim) |i| {
                         x[i] += (data.k1[i] + B * data.k2[i] + B * data.k3[i] + data.k4[i]) * h * D;
                     }
                 } else {
-                    for (0..self.dim) |i| {
+                    for (0..x_dim) |i| {
                         x[i] += (data.k1[i] + B * data.k2[i] + B * data.k3[i] + data.k4[i]) * h * D;
                     }
                 }
@@ -202,24 +185,8 @@ fn integrate(comptime v_len: usize) fn (
         }
     }.integrate;
 }
-fn adjust(self: *Solver, ode: *const Ode) !void {
-    if (self.dim == ode.getXDim())
-        return;
-    self.dim = ode.getXDim();
-    const data: *Data = @ptrCast(@alignCast(self.data));
-    try data.ensureCapacity(self.dim);
-    inline for ([_]usize{ 32, 16, 8, 4, 2, 0 }) |v_len| {
-        if (self.dim >= 2 * v_len) {
-            self.vtable = &.{
-                .deinit = deinit,
-                .integrate = integrate(v_len),
-            };
-            return;
-        }
-    }
-}
 
-const Factory = struct {
+pub const Factory = struct {
     fn init(allocator: Allocator, args: []const Argument) !Solver {
         const h_max = args[0].value.f;
         return try RK4.init(allocator, h_max);
@@ -253,8 +220,13 @@ test "factory" {
         var ode = try ds.ode.Constant.init(std.testing.allocator, n);
         defer ode.deinit();
 
-        var t = ode.t;
-        const x = ode.x;
+        var t = ode.getT();
+        const x = try std.testing.allocator.alloc(f64, n);
+        defer std.testing.allocator.free(x);
+
+        for (0..n) |i| {
+            x[i] = ode.getX(i);
+        }
         try solver.integrate(&ode, &t, x.ptr, t + 0.1);
     }
 }
