@@ -6,9 +6,6 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 
 pub const Solver = struct {
-    allocator: Allocator,
-    args: []const Argument,
-    dim: usize,
     data: *anyopaque,
     vtable: *const VTable,
 
@@ -50,40 +47,21 @@ pub const Solver = struct {
 pub const Euler = struct {
     const Data = struct {
         allocator: Allocator,
-        capacity: usize,
+        h_max: f64,
         y: []f64,
-
-        pub fn init(allocator: Allocator) !Data {
-            return .{
-                .allocator = allocator,
-                .capacity = 0,
-                .y = try allocator.alloc(f64, 0),
-            };
-        }
-        pub fn ensureCapacity(self: *Data, n: usize) !void {
-            if (n <= self.capacity) return;
-            self.y = try self.allocator.realloc(self.y, n);
-            self.capacity = n;
-        }
-        pub fn deinit(self: *Data) void {
-            self.allocator.free(self.y);
-            self.capacity = 0;
-        }
     };
-    pub fn init(allocator: Allocator, h_max: f64) !Solver {
-        const args = try allocator.alloc(Argument, 1);
-        errdefer allocator.free(args);
-        args[0] = .{ .name = "h_max", .value = .{ .f = h_max } };
 
+    pub fn init(allocator: Allocator, h_max: f64) !Solver {
         const data = try allocator.create(Data);
         errdefer allocator.destroy(data);
-        data.* = try Data.init(allocator);
-        errdefer data.deinit();
+
+        data.* = .{
+            .allocator = allocator,
+            .h_max = h_max,
+            .y = try allocator.alloc(f64, 0),
+        };
 
         return .{
-            .allocator = allocator,
-            .args = args,
-            .dim = 0,
             .data = data,
             .vtable = &.{
                 .deinit = deinit,
@@ -92,20 +70,22 @@ pub const Euler = struct {
         };
     }
 
-    pub fn deinit(self: *Solver) void {
+    fn deinit(self: *Solver) void {
         const data: *Data = @ptrCast(@alignCast(self.data));
-        data.deinit();
-        self.allocator.free(self.args);
-        self.allocator.destroy(data);
+        data.allocator.free(data.y);
+        data.allocator.destroy(data);
     }
 
-    pub fn integrate(self: *Solver, ode: *const Ode, t: *f64, x: [*]f64, t_end: f64) anyerror!void {
+    fn integrate(self: *Solver, ode: *const Ode, t: *f64, x: [*]f64, t_end: f64) anyerror!void {
         const data: *Data = @ptrCast(@alignCast(self.data));
-        self.dim = ode.getXDim();
-        try data.ensureCapacity(self.dim);
+
+        const x_dim = ode.getXDim();
+        if (data.y.len < x_dim) {
+            data.y = try data.allocator.realloc(data.y, x_dim);
+        }
 
         const sign: f64 = if (t_end > t.*) 1.0 else -1.0;
-        var h = sign * self.args[0].value.f;
+        var h = sign * data.h_max;
 
         for (0..1_000_000_000) |_| {
             if (sign * (t.* - t_end) >= 0)
@@ -114,7 +94,7 @@ pub const Euler = struct {
                 h = t_end - t.* + sign * 1e-10;
             }
             ode.calc(t.*, x, data.y.ptr);
-            for (0..self.dim) |i| {
+            for (0..x_dim) |i| {
                 x[i] += h * data.y[i];
             }
             t.* += h;

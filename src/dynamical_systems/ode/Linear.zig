@@ -5,42 +5,45 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const Linear = @This();
 
+const Data = struct {
+    allocator: Allocator,
+    n: usize,
+    t: f64,
+    x: []f64,
+    p: []f64,
+};
+
 pub fn init(allocator: Allocator, n: usize) !Ode {
-    const t = 0.0;
-
-    const args = try allocator.alloc(Argument, 1);
-    errdefer allocator.free(args);
-    args[0] = .{ .name = "n", .value = .{ .u = n } };
-
-    const x_dim = n;
-    const x = try allocator.alloc(f64, x_dim);
-    errdefer allocator.free(x);
-    for (0..x_dim) |i| x[i] = 0.0;
-
-    const p_dim = x_dim * x_dim;
-    const p = try allocator.alloc(f64, p_dim);
-    errdefer allocator.free(p);
-    for (0..p_dim) |i| p[i] = 0.0;
+    const data = try allocator.create(Data);
+    errdefer allocator.destroy(data);
+    data.* = .{
+        .allocator = allocator,
+        .n = n,
+        .t = 0.0,
+        .x = try allocator.alloc(f64, n),
+        .p = try allocator.alloc(f64, n * n),
+    };
 
     inline for ([_]usize{ 32, 16, 8, 4, 2, 0 }) |v_len| {
-        if (x_dim >= 2 * v_len)
+        if (n >= 2 * v_len)
             return .{
-                .allocator = allocator,
-                .args = args,
-                .t = t,
-                .x = x,
-                .p = p,
+                .data = data,
                 .vtable = &.{
                     .deinit = deinit,
                     .calc = calc(v_len),
+                    .getT = getT,
+                    .getX = getX,
+                    .getP = getP,
                 },
             };
     }
 }
+
 fn deinit(self: *Ode) void {
-    self.allocator.free(self.args);
-    self.allocator.free(self.x);
-    self.allocator.free(self.p);
+    const data: *Data = @ptrCast(@alignCast(self.data));
+    data.allocator.free(data.x);
+    data.allocator.free(data.p);
+    data.allocator.destroy(data);
 }
 
 fn calc(comptime v_len: usize) fn (self: *const Ode, t: f64, x: [*]const f64, dxdt: [*]f64) void {
@@ -49,35 +52,51 @@ fn calc(comptime v_len: usize) fn (self: *const Ode, t: f64, x: [*]const f64, dx
             @setRuntimeSafety(false);
             @setFloatMode(.optimized);
             _ = t;
+
+            const data: *Data = @ptrCast(@alignCast(self.data));
+
             if (comptime v_len == 0) {
-                for (0..self.x.len) |i| {
+                for (0..data.n) |i| {
                     dxdt[i] = 0.0;
-                    for (0..self.x.len) |j| {
-                        dxdt[i] += self.p[i * self.x.len + j] * x[j];
+                    for (0..data.n) |j| {
+                        dxdt[i] += data.p[i * data.n + j] * x[j];
                     }
                 }
             } else {
                 const V = @Vector(v_len, f64);
-                for (0..self.x.len) |i| {
-                    const k = i * self.x.len;
+                for (0..data.n) |i| {
+                    const k = i * data.n;
                     var tmp = @as(V, @splat(0.0));
                     var j = @as(usize, 0);
-                    while (j + v_len <= self.x.len) : (j += v_len) {
+                    while (j + v_len <= data.n) : (j += v_len) {
                         tmp = @mulAdd(
                             V,
-                            self.p[k + j ..][0..v_len].*,
+                            data.p[k + j ..][0..v_len].*,
                             x[j..][0..v_len].*,
                             tmp,
                         );
                     }
                     dxdt[i] = @reduce(.Add, tmp);
-                    for (j..self.x.len) |m| {
-                        dxdt[i] += self.p[k + m] * x[m];
+                    for (j..data.n) |m| {
+                        dxdt[i] += data.p[k + m] * x[m];
                     }
                 }
             }
         }
     }.calc;
+}
+
+fn getT(self: *const Ode) *f64 {
+    const data: *Data = @ptrCast(@alignCast(self.data));
+    return &data.t;
+}
+fn getX(self: *const Ode) []f64 {
+    const data: *Data = @ptrCast(@alignCast(self.data));
+    return data.x;
+}
+fn getP(self: *const Ode) []f64 {
+    const data: *Data = @ptrCast(@alignCast(self.data));
+    return data.p;
 }
 
 const Factory = struct {
