@@ -1,36 +1,30 @@
 const ds = @import("dynamical_systems");
+const std = @import("std");
+const builtin = @import("builtin");
+
 const Argument = ds.Argument;
 const Ode = ds.ode.Ode;
 const Solver = ds.solver.Solver;
 
-const std = @import("std");
 const Allocator = std.mem.Allocator;
 const RK4 = @This();
 
 const Data = struct {
     allocator: Allocator,
     h_max: f64,
-    y: []f64,
-    k1: []f64,
-    k2: []f64,
-    k3: []f64,
-    k4: []f64,
+    buffer: []f64,
 };
 
 pub fn init(allocator: Allocator, h_max: f64) !Solver {
     const data = try allocator.create(Data);
     errdefer allocator.destroy(data);
 
-    const y = try allocator.alloc(f64, 0);
-    errdefer allocator.free(y);
+    const buffer = try allocator.alloc(f64, 0);
+    errdefer allocator.free(buffer);
     data.* = .{
         .allocator = allocator,
         .h_max = h_max,
-        .y = y,
-        .k1 = y[0..0],
-        .k2 = y[0..0],
-        .k3 = y[0..0],
-        .k4 = y[0..0],
+        .buffer = buffer,
     };
 
     return .{
@@ -44,7 +38,7 @@ pub fn init(allocator: Allocator, h_max: f64) !Solver {
 
 fn deinit(self: *Solver) void {
     const data: *Data = @ptrCast(@alignCast(self.data));
-    data.allocator.free(data.y);
+    data.allocator.free(data.buffer);
     data.allocator.destroy(data);
 }
 
@@ -71,18 +65,22 @@ fn integrate(comptime v_len: usize) fn (
             x: [*]f64,
             t_end: f64,
         ) anyerror!void {
-            @setRuntimeSafety(false);
-            @setFloatMode(.optimized);
+            if (comptime builtin.mode != .Debug) {
+                @setRuntimeSafety(false);
+                @setFloatMode(.optimized);
+            }
 
             const data: *Data = @ptrCast(@alignCast(self.data));
             const x_dim = ode.getXDim();
-            if (data.y.len < x_dim) {
-                data.y = try data.allocator.realloc(data.y, x_dim * 5);
-                data.k1 = data.y[x_dim .. x_dim * 2];
-                data.k2 = data.y[x_dim * 2 .. x_dim * 3];
-                data.k3 = data.y[x_dim * 3 .. x_dim * 4];
-                data.k4 = data.y[x_dim * 4 .. x_dim * 5];
+            if (data.buffer.len < x_dim * 5) {
+                data.buffer = try data.allocator.realloc(data.buffer, x_dim * 5);
             }
+            const y = data.buffer.ptr;
+            const k1 = y + x_dim;
+            const k2 = k1 + x_dim;
+            const k3 = k2 + x_dim;
+            const k4 = k3 + x_dim;
+
             const sign: f64 = if (t_end > t.*) 1.0 else -1.0;
             var h = sign * data.h_max;
             var h_vec: T = if (v_len > 0) @splat(h) else h;
@@ -94,64 +92,64 @@ fn integrate(comptime v_len: usize) fn (
                     h = t_end - t.* + sign * 1e-10;
                     h_vec = if (v_len > 0) @splat(h) else h;
                 }
-                ode.calc(t.*, x, data.k1.ptr);
+                ode.calc(t.*, x, k1);
                 if (comptime v_len > 0) {
                     var j = @as(usize, 0);
                     while (j + v_len <= x_dim) : (j += v_len) {
-                        data.y[j..][0..v_len].* = @mulAdd(
+                        y[j..][0..v_len].* = @mulAdd(
                             T,
                             A_vec * h_vec,
-                            data.k1[j..][0..v_len].*,
+                            k1[j..][0..v_len].*,
                             x[j..][0..v_len].*,
                         );
                     }
                     for (j..x_dim) |i| {
-                        data.y[i] = x[i] + A * h * data.k1[i];
+                        y[i] = x[i] + A * h * k1[i];
                     }
                 } else {
                     for (0..x_dim) |i| {
-                        data.y[i] = x[i] + A * h * data.k1[i];
+                        y[i] = x[i] + A * h * k1[i];
                     }
                 }
-                ode.calc(t.* + h * C, data.y.ptr, data.k2.ptr);
+                ode.calc(t.* + h * C, y, k2);
                 if (comptime v_len > 0) {
                     var j = @as(usize, 0);
                     while (j + v_len <= x_dim) : (j += v_len) {
-                        data.y[j..][0..v_len].* = @mulAdd(
+                        y[j..][0..v_len].* = @mulAdd(
                             T,
                             A_vec * h_vec,
-                            data.k2[j..][0..v_len].*,
+                            k2[j..][0..v_len].*,
                             x[j..][0..v_len].*,
                         );
                     }
                     for (j..x_dim) |i| {
-                        data.y[i] = x[i] + A * h * data.k2[i];
+                        y[i] = x[i] + A * h * k2[i];
                     }
                 } else {
                     for (0..x_dim) |i| {
-                        data.y[i] = x[i] + A * h * data.k2[i];
+                        y[i] = x[i] + A * h * k2[i];
                     }
                 }
-                ode.calc(t.* + h * C, data.y.ptr, data.k3.ptr);
+                ode.calc(t.* + h * C, y, k3);
                 if (comptime v_len > 0) {
                     var j = @as(usize, 0);
                     while (j + v_len <= x_dim) : (j += v_len) {
-                        data.y[j..][0..v_len].* = @mulAdd(
+                        y[j..][0..v_len].* = @mulAdd(
                             T,
                             h_vec,
-                            data.k3[j..][0..v_len].*,
+                            k3[j..][0..v_len].*,
                             x[j..][0..v_len].*,
                         );
                     }
                     for (j..x_dim) |i| {
-                        data.y[i] = x[i] + h * data.k3[i];
+                        y[i] = x[i] + h * k3[i];
                     }
                 } else {
                     for (0..x_dim) |i| {
-                        data.y[i] = x[i] + h * data.k3[i];
+                        y[i] = x[i] + h * k3[i];
                     }
                 }
-                ode.calc(t.* + h, data.y.ptr, data.k4.ptr);
+                ode.calc(t.* + h, y, k4);
                 if (comptime v_len > 0) {
                     var j = @as(usize, 0);
                     while (j + v_len <= x_dim) : (j += v_len) {
@@ -161,23 +159,23 @@ fn integrate(comptime v_len: usize) fn (
                             @mulAdd(
                                 T,
                                 B_vec,
-                                data.k2[j..][0..v_len].*,
-                                data.k1[j..][0..v_len].*,
+                                k2[j..][0..v_len].*,
+                                k1[j..][0..v_len].*,
                             ) + @mulAdd(
                                 T,
                                 B_vec,
-                                data.k3[j..][0..v_len].*,
-                                data.k4[j..][0..v_len].*,
+                                k3[j..][0..v_len].*,
+                                k4[j..][0..v_len].*,
                             ),
                             x[j..][0..v_len].*,
                         );
                     }
                     for (j..x_dim) |i| {
-                        x[i] += (data.k1[i] + B * data.k2[i] + B * data.k3[i] + data.k4[i]) * h * D;
+                        x[i] += (k1[i] + B * k2[i] + B * k3[i] + k4[i]) * h * D;
                     }
                 } else {
                     for (0..x_dim) |i| {
-                        x[i] += (data.k1[i] + B * data.k2[i] + B * data.k3[i] + data.k4[i]) * h * D;
+                        x[i] += (k1[i] + B * k2[i] + B * k3[i] + k4[i]) * h * D;
                     }
                 }
                 t.* += h;
