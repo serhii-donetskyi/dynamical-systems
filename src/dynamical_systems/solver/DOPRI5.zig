@@ -170,6 +170,7 @@ fn integrate(comptime v_len: usize) fn (
                     break;
                 if (sign * (t.* + h - t_end) >= 0) {
                     h = t_end - t.* + sign * 1e-10;
+                    if (comptime v_len > 0) h_vec = @splat(h);
                 }
                 // stage 1
                 ode.calc(t.*, x, k1);

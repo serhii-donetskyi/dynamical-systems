@@ -12,6 +12,7 @@ const RK4 = @This();
 const Data = struct {
     allocator: Allocator,
     h_max: f64,
+    dim: usize,
     buffer: []f64,
 };
 
@@ -24,6 +25,7 @@ pub fn init(allocator: Allocator, h_max: f64) !Solver {
     data.* = .{
         .allocator = allocator,
         .h_max = h_max,
+        .dim = 0,
         .buffer = buffer,
     };
 
@@ -50,15 +52,15 @@ fn integrate(comptime v_len: usize) fn (
     t_end: f64,
 ) anyerror!void {
     return struct {
-        const T = if (v_len > 0) @Vector(v_len, f64) else f64;
+        const V = if (v_len > 0) @Vector(v_len, f64) else void;
         const C = @as(f64, 0.5);
         const A = @as(f64, 0.5);
         const B = @as(f64, 2.0);
         const D = @as(f64, 1.0 / 6.0);
-        const A_vec = if (v_len > 0) @as(T, @splat(A)) else A;
-        const B_vec = if (v_len > 0) @as(T, @splat(B)) else B;
-        const D_vec = if (v_len > 0) @as(T, @splat(D)) else D;
-        fn integrate(
+        const A_vec = if (v_len > 0) @as(V, @splat(A)) else {};
+        const B_vec = if (v_len > 0) @as(V, @splat(B)) else {};
+        const D_vec = if (v_len > 0) @as(V, @splat(D)) else {};
+        fn _integrate(
             self: *Solver,
             ode: *const Ode,
             t: *f64,
@@ -72,8 +74,21 @@ fn integrate(comptime v_len: usize) fn (
 
             const data: *Data = @ptrCast(@alignCast(self.data));
             const x_dim = ode.getXDim();
-            if (data.buffer.len < x_dim * 5) {
-                data.buffer = try data.allocator.realloc(data.buffer, x_dim * 5);
+            if (x_dim != data.dim) {
+                if (data.buffer.len < x_dim * 5) {
+                    data.buffer = try data.allocator.realloc(data.buffer, x_dim * 5);
+                }
+                data.dim = x_dim; // make sure check passes next time we call this function
+                inline for ([_]usize{ 32, 16, 8, 4, 2, 0 }) |v_len_| {
+                    if (x_dim >= 2 * v_len_) { // pick an integration function
+                        self.vtable = &.{
+                            .deinit = deinit,
+                            .integrate = integrate(v_len_),
+                        };
+                        return self.integrate(ode, t, x, t_end);
+                    }
+                }
+                unreachable;
             }
             const y = data.buffer.ptr;
             const k1 = y + x_dim;
@@ -83,21 +98,25 @@ fn integrate(comptime v_len: usize) fn (
 
             const sign: f64 = if (t_end > t.*) 1.0 else -1.0;
             var h = sign * data.h_max;
-            var h_vec: T = if (v_len > 0) @splat(h) else h;
+            var h_vec: V = if (v_len > 0) @splat(h) else {};
 
             for (0..1_000_000_000) |_| {
                 if (sign * (t.* - t_end) >= 0)
                     break;
                 if (sign * (t.* + h - t_end) >= 0) {
                     h = t_end - t.* + sign * 1e-10;
-                    h_vec = if (v_len > 0) @splat(h) else h;
+                    if (comptime v_len > 0) h_vec = @splat(h);
                 }
+
+                // stage 1
                 ode.calc(t.*, x, k1);
+
+                // stage 2
                 if (comptime v_len > 0) {
                     var j = @as(usize, 0);
                     while (j + v_len <= x_dim) : (j += v_len) {
                         y[j..][0..v_len].* = @mulAdd(
-                            T,
+                            V,
                             A_vec * h_vec,
                             k1[j..][0..v_len].*,
                             x[j..][0..v_len].*,
@@ -112,11 +131,13 @@ fn integrate(comptime v_len: usize) fn (
                     }
                 }
                 ode.calc(t.* + h * C, y, k2);
+
+                // stage 3
                 if (comptime v_len > 0) {
                     var j = @as(usize, 0);
                     while (j + v_len <= x_dim) : (j += v_len) {
                         y[j..][0..v_len].* = @mulAdd(
-                            T,
+                            V,
                             A_vec * h_vec,
                             k2[j..][0..v_len].*,
                             x[j..][0..v_len].*,
@@ -131,11 +152,13 @@ fn integrate(comptime v_len: usize) fn (
                     }
                 }
                 ode.calc(t.* + h * C, y, k3);
+
+                // stage 4
                 if (comptime v_len > 0) {
                     var j = @as(usize, 0);
                     while (j + v_len <= x_dim) : (j += v_len) {
                         y[j..][0..v_len].* = @mulAdd(
-                            T,
+                            V,
                             h_vec,
                             k3[j..][0..v_len].*,
                             x[j..][0..v_len].*,
@@ -150,19 +173,21 @@ fn integrate(comptime v_len: usize) fn (
                     }
                 }
                 ode.calc(t.* + h, y, k4);
+
+                // update x
                 if (comptime v_len > 0) {
                     var j = @as(usize, 0);
                     while (j + v_len <= x_dim) : (j += v_len) {
                         x[j..][0..v_len].* = @mulAdd(
-                            T,
+                            V,
                             h_vec * D_vec,
                             @mulAdd(
-                                T,
+                                V,
                                 B_vec,
                                 k2[j..][0..v_len].*,
                                 k1[j..][0..v_len].*,
                             ) + @mulAdd(
-                                T,
+                                V,
                                 B_vec,
                                 k3[j..][0..v_len].*,
                                 k4[j..][0..v_len].*,
@@ -181,7 +206,7 @@ fn integrate(comptime v_len: usize) fn (
                 t.* += h;
             }
         }
-    }.integrate;
+    }._integrate;
 }
 
 pub const Factory = struct {
