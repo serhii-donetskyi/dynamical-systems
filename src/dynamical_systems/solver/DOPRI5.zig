@@ -9,49 +9,11 @@ const Solver = ds.solver.Solver;
 const Allocator = std.mem.Allocator;
 const DOPRI5 = @This();
 
-const C2 = (2.0 / 10.0);
-const C3 = (3.0 / 10.0);
-const C4 = (8.0 / 10.0);
-const C5 = (8.0 / 9.0);
-
-const A21 = (2.0 / 10.0);
-
-const A31 = (3.0 / 40.0);
-const A32 = (9.0 / 40.0);
-
-const A41 = (44.0 / 45.0);
-const A42 = (-56.0 / 15.0);
-const A43 = (32.0 / 9.0);
-
-const A51 = (19372.0 / 6561.0);
-const A52 = (-25360.0 / 2187.0);
-const A53 = (64448.0 / 6561.0);
-const A54 = (-212.0 / 729.0);
-
-const A61 = (9017.0 / 3168.0);
-const A62 = (-355.0 / 33.0);
-const A63 = (46732.0 / 5247.0);
-const A64 = (49.0 / 176.0);
-const A65 = (-5103.0 / 18656.0);
-
-const A71 = (35.0 / 384.0);
-const A73 = (500.0 / 1113.0);
-const A74 = (125.0 / 192.0);
-const A75 = (-2187.0 / 6784.0);
-const A76 = (11.0 / 84.0);
-
-const E1 = (71.0 / 57600.0);
-const E3 = (-71.0 / 16695.0);
-const E4 = (71.0 / 1920.0);
-const E5 = (-17253.0 / 339200.0);
-const E6 = (22.0 / 525.0);
-const E7 = (-1.0 / 40.0);
-
 const Data = struct {
     allocator: Allocator,
     h_max: f64,
     eps: f64,
-
+    dim: usize,
     buffer: []f64,
 };
 
@@ -65,6 +27,7 @@ pub fn init(allocator: Allocator, h_max: f64, eps: f64) !Solver {
         .allocator = allocator,
         .h_max = h_max,
         .eps = eps,
+        .dim = 0,
         .buffer = buffer,
     };
     return .{
@@ -90,7 +53,75 @@ fn integrate(comptime v_len: usize) fn (
     t_end: f64,
 ) anyerror!void {
     return struct {
-        fn integrate(
+        const C2 = (2.0 / 10.0);
+        const C3 = (3.0 / 10.0);
+        const C4 = (8.0 / 10.0);
+        const C5 = (8.0 / 9.0);
+
+        const A21 = (2.0 / 10.0);
+
+        const A31 = (3.0 / 40.0);
+        const A32 = (9.0 / 40.0);
+
+        const A41 = (44.0 / 45.0);
+        const A42 = (-56.0 / 15.0);
+        const A43 = (32.0 / 9.0);
+
+        const A51 = (19372.0 / 6561.0);
+        const A52 = (-25360.0 / 2187.0);
+        const A53 = (64448.0 / 6561.0);
+        const A54 = (-212.0 / 729.0);
+
+        const A61 = (9017.0 / 3168.0);
+        const A62 = (-355.0 / 33.0);
+        const A63 = (46732.0 / 5247.0);
+        const A64 = (49.0 / 176.0);
+        const A65 = (-5103.0 / 18656.0);
+
+        const A71 = (35.0 / 384.0);
+        const A73 = (500.0 / 1113.0);
+        const A74 = (125.0 / 192.0);
+        const A75 = (-2187.0 / 6784.0);
+        const A76 = (11.0 / 84.0);
+
+        const E1 = (71.0 / 57600.0);
+        const E3 = (-71.0 / 16695.0);
+        const E4 = (71.0 / 1920.0);
+        const E5 = (-17253.0 / 339200.0);
+        const E6 = (22.0 / 525.0);
+        const E7 = (-1.0 / 40.0);
+
+        const V = if (v_len > 0) @Vector(v_len, f64) else void;
+
+        const A21_vec = if (v_len > 0) @as(V, @splat(A21)) else {};
+        const A31_vec = if (v_len > 0) @as(V, @splat(A31)) else {};
+        const A32_vec = if (v_len > 0) @as(V, @splat(A32)) else {};
+        const A41_vec = if (v_len > 0) @as(V, @splat(A41)) else {};
+        const A42_vec = if (v_len > 0) @as(V, @splat(A42)) else {};
+        const A43_vec = if (v_len > 0) @as(V, @splat(A43)) else {};
+        const A51_vec = if (v_len > 0) @as(V, @splat(A51)) else {};
+        const A52_vec = if (v_len > 0) @as(V, @splat(A52)) else {};
+        const A53_vec = if (v_len > 0) @as(V, @splat(A53)) else {};
+        const A54_vec = if (v_len > 0) @as(V, @splat(A54)) else {};
+        const A61_vec = if (v_len > 0) @as(V, @splat(A61)) else {};
+        const A62_vec = if (v_len > 0) @as(V, @splat(A62)) else {};
+        const A63_vec = if (v_len > 0) @as(V, @splat(A63)) else {};
+        const A64_vec = if (v_len > 0) @as(V, @splat(A64)) else {};
+        const A65_vec = if (v_len > 0) @as(V, @splat(A65)) else {};
+        const A71_vec = if (v_len > 0) @as(V, @splat(A71)) else {};
+        const A73_vec = if (v_len > 0) @as(V, @splat(A73)) else {};
+        const A74_vec = if (v_len > 0) @as(V, @splat(A74)) else {};
+        const A75_vec = if (v_len > 0) @as(V, @splat(A75)) else {};
+        const A76_vec = if (v_len > 0) @as(V, @splat(A76)) else {};
+        const E1_vec = if (v_len > 0) @as(V, @splat(E1)) else {};
+        const E3_vec = if (v_len > 0) @as(V, @splat(E3)) else {};
+        const E4_vec = if (v_len > 0) @as(V, @splat(E4)) else {};
+        const E5_vec = if (v_len > 0) @as(V, @splat(E5)) else {};
+        const E6_vec = if (v_len > 0) @as(V, @splat(E6)) else {};
+        const E7_vec = if (v_len > 0) @as(V, @splat(E7)) else {};
+        const rtol_vec = if (v_len > 0) @as(V, @splat(1e-5)) else {};
+
+        fn _integrate(
             self: *Solver,
             ode: *const Ode,
             t: *f64,
@@ -104,9 +135,23 @@ fn integrate(comptime v_len: usize) fn (
 
             const data: *Data = @ptrCast(@alignCast(self.data));
             const x_dim = ode.getXDim();
-            if (data.buffer.len < x_dim * 7) {
-                data.buffer = try data.allocator.realloc(data.buffer, x_dim * 7);
+            if (x_dim != data.dim) { // check if we are using the correct integration function
+                if (data.buffer.len < x_dim * 7) { // check if we have enough buffer
+                    data.buffer = try data.allocator.realloc(data.buffer, x_dim * 7);
+                }
+                data.dim = x_dim; // make sure check passes next time we call this function
+                inline for ([_]usize{ 32, 16, 8, 4, 2, 0 }) |v_len_| {
+                    if (x_dim >= 2 * v_len_) { // pick an integration function
+                        self.vtable = &.{
+                            .deinit = deinit,
+                            .integrate = integrate(v_len_),
+                        };
+                        return self.integrate(ode, t, x, t_end);
+                    }
+                }
+                unreachable;
             }
+
             const y = data.buffer.ptr;
             const k1 = y + x_dim;
             const k2 = k1 + x_dim;
@@ -117,6 +162,7 @@ fn integrate(comptime v_len: usize) fn (
 
             const sign: f64 = if (t_end > t.*) 1.0 else -1.0;
             var h = sign * data.h_max;
+            var h_vec: V = if (v_len > 0) @splat(h) else {};
             var reject = false;
 
             for (0..1_000_000_000) |_| {
@@ -125,44 +171,12 @@ fn integrate(comptime v_len: usize) fn (
                 if (sign * (t.* + h - t_end) >= 0) {
                     h = t_end - t.* + sign * 1e-10;
                 }
+                // stage 1
+                ode.calc(t.*, x, k1);
+
+                // stage 2
                 if (comptime v_len > 0) {
-                    const V = @Vector(v_len, f64);
-                    const h_vec = @as(V, @splat(h));
-
-                    const A21_vec = @as(V, @splat(A21));
-                    const A31_vec = @as(V, @splat(A31));
-                    const A32_vec = @as(V, @splat(A32));
-                    const A41_vec = @as(V, @splat(A41));
-                    const A42_vec = @as(V, @splat(A42));
-                    const A43_vec = @as(V, @splat(A43));
-                    const A51_vec = @as(V, @splat(A51));
-                    const A52_vec = @as(V, @splat(A52));
-                    const A53_vec = @as(V, @splat(A53));
-                    const A54_vec = @as(V, @splat(A54));
-                    const A61_vec = @as(V, @splat(A61));
-                    const A62_vec = @as(V, @splat(A62));
-                    const A63_vec = @as(V, @splat(A63));
-                    const A64_vec = @as(V, @splat(A64));
-                    const A65_vec = @as(V, @splat(A65));
-                    const A71_vec = @as(V, @splat(A71));
-                    const A73_vec = @as(V, @splat(A73));
-                    const A74_vec = @as(V, @splat(A74));
-                    const A75_vec = @as(V, @splat(A75));
-                    const A76_vec = @as(V, @splat(A76));
-                    // const E1_vec = @as(V, @splat(E1));
-                    // const E3_vec = @as(V, @splat(E3));
-                    // const E4_vec = @as(V, @splat(E4));
-                    // const E5_vec = @as(V, @splat(E5));
-                    // const E6_vec = @as(V, @splat(E6));
-                    // const E7_vec = @as(V, @splat(E7));
-
-                    var j = @as(usize, 0);
-
-                    // stage 1
-                    ode.calc(t.*, x, k1);
-
-                    // stage 2
-                    j = 0;
+                    var j: usize = 0;
                     while (j + v_len <= x_dim) : (j += v_len) {
                         y[j..][0..v_len].* = @mulAdd(
                             V,
@@ -174,10 +188,16 @@ fn integrate(comptime v_len: usize) fn (
                     for (j..x_dim) |i| {
                         y[i] = x[i] + h * A21 * k1[i];
                     }
-                    ode.calc(t.* + h * C2, y, k2);
+                } else {
+                    for (0..x_dim) |i| {
+                        y[i] = x[i] + h * A21 * k1[i];
+                    }
+                }
+                ode.calc(t.* + h * C2, y, k2);
 
-                    // stage 3
-                    j = 0;
+                // stage 3
+                if (comptime v_len > 0) {
+                    var j: usize = 0;
                     while (j + v_len <= x_dim) : (j += v_len) {
                         y[j..][0..v_len].* = @mulAdd(
                             V,
@@ -189,10 +209,16 @@ fn integrate(comptime v_len: usize) fn (
                     for (j..x_dim) |i| {
                         y[i] = x[i] + h * (A31 * k1[i] + A32 * k2[i]);
                     }
-                    ode.calc(t.* + h * C3, y, k3);
+                } else {
+                    for (0..x_dim) |i| {
+                        y[i] = x[i] + h * (A31 * k1[i] + A32 * k2[i]);
+                    }
+                }
+                ode.calc(t.* + h * C3, y, k3);
 
-                    // stage 4
-                    j = 0;
+                // stage 4
+                if (comptime v_len > 0) {
+                    var j: usize = 0;
                     while (j + v_len <= x_dim) : (j += v_len) {
                         y[j..][0..v_len].* = @mulAdd(
                             V,
@@ -204,10 +230,16 @@ fn integrate(comptime v_len: usize) fn (
                     for (j..x_dim) |i| {
                         y[i] = x[i] + h * (A41 * k1[i] + A42 * k2[i] + A43 * k3[i]);
                     }
-                    ode.calc(t.* + h * C4, y, k4);
+                } else {
+                    for (0..x_dim) |i| {
+                        y[i] = x[i] + h * (A41 * k1[i] + A42 * k2[i] + A43 * k3[i]);
+                    }
+                }
+                ode.calc(t.* + h * C4, y, k4);
 
-                    // stage 5
-                    j = 0;
+                // stage 5
+                if (comptime v_len > 0) {
+                    var j: usize = 0;
                     while (j + v_len <= x_dim) : (j += v_len) {
                         y[j..][0..v_len].* = @mulAdd(
                             V,
@@ -219,11 +251,17 @@ fn integrate(comptime v_len: usize) fn (
                     for (j..x_dim) |i| {
                         y[i] = x[i] + h * (A51 * k1[i] + A52 * k2[i] + A53 * k3[i] + A54 * k4[i]);
                     }
-                    ode.calc(t.* + h * C5, y, k5);
+                } else {
+                    for (0..x_dim) |i| {
+                        y[i] = x[i] + h * (A51 * k1[i] + A52 * k2[i] + A53 * k3[i] + A54 * k4[i]);
+                    }
+                }
+                ode.calc(t.* + h * C5, y, k5);
 
-                    // stage 6
-                    j = 0;
-                    const tph = t.* + h;
+                // stage 6
+                const tph = t.* + h;
+                if (comptime v_len > 0) {
+                    var j: usize = 0;
                     while (j + v_len <= x_dim) : (j += v_len) {
                         y[j..][0..v_len].* = @mulAdd(
                             V,
@@ -235,10 +273,16 @@ fn integrate(comptime v_len: usize) fn (
                     for (j..x_dim) |i| {
                         y[i] = x[i] + h * (A61 * k1[i] + A62 * k2[i] + A63 * k3[i] + A64 * k4[i] + A65 * k5[i]);
                     }
-                    ode.calc(tph, y, k6);
+                } else {
+                    for (0..x_dim) |i| {
+                        y[i] = x[i] + h * (A61 * k1[i] + A62 * k2[i] + A63 * k3[i] + A64 * k4[i] + A65 * k5[i]);
+                    }
+                }
+                ode.calc(tph, y, k6);
 
-                    // stage 7
-                    j = 0;
+                // stage 7
+                if (comptime v_len > 0) {
+                    var j: usize = 0;
                     while (j + v_len <= x_dim) : (j += v_len) {
                         y[j..][0..v_len].* = @mulAdd(
                             V,
@@ -250,91 +294,72 @@ fn integrate(comptime v_len: usize) fn (
                     for (j..x_dim) |i| {
                         y[i] = x[i] + h * (A71 * k1[i] + A73 * k3[i] + A74 * k4[i] + A75 * k5[i] + A76 * k6[i]);
                     }
-                    ode.calc(tph, y, k2);
-
-                    // error estimation
                 } else {
-                    // stage 1
-                    ode.calc(t.*, x, k1);
-
-                    // stage 2
-                    for (0..x_dim) |i| {
-                        y[i] = x[i] + h * A21 * k1[i];
-                    }
-                    ode.calc(t.* + h * C2, y, k2);
-
-                    // stage 3
-                    for (0..x_dim) |i| {
-                        y[i] = x[i] + h * (A31 * k1[i] + A32 * k2[i]);
-                    }
-                    ode.calc(t.* + h * C3, y, k3);
-
-                    // stage 4
-                    for (0..x_dim) |i| {
-                        y[i] = x[i] + h * (A41 * k1[i] + A42 * k2[i] + A43 * k3[i]);
-                    }
-                    ode.calc(t.* + h * C4, y, k4);
-
-                    // stage 5
-                    for (0..x_dim) |i| {
-                        y[i] = x[i] + h * (A51 * k1[i] + A52 * k2[i] + A53 * k3[i] + A54 * k4[i]);
-                    }
-                    ode.calc(t.* + h * C5, y, k5);
-
-                    // stage 6
-                    const tph = t.* + h;
-                    for (0..x_dim) |i| {
-                        y[i] = x[i] + h * (A61 * k1[i] + A62 * k2[i] + A63 * k3[i] + A64 * k4[i] + A65 * k5[i]);
-                    }
-                    ode.calc(tph, y, k6);
-
-                    // stage 7
                     for (0..x_dim) |i| {
                         y[i] = x[i] + h * (A71 * k1[i] + A73 * k3[i] + A74 * k4[i] + A75 * k5[i] + A76 * k6[i]);
                     }
-                    ode.calc(tph, y, k2);
+                }
+                ode.calc(tph, y, k2);
 
-                    // error estimation
-                    var err: f64 = 0.0;
+                // error estimation
+                var err: f64 = 0.0;
+                if (comptime v_len > 0) {
+                    var err_vec: V = @splat(0.0);
+                    var j: usize = 0;
+                    while (j + v_len <= x_dim) : (j += v_len) {
+                        var rerr_vec: V = h_vec * (E1_vec * k1[j..][0..v_len].* + E3_vec * k3[j..][0..v_len].* + E4_vec * k4[j..][0..v_len].* + E5_vec * k5[j..][0..v_len].* + E6_vec * k6[j..][0..v_len].* + E7_vec * k2[j..][0..v_len].*);
+                        rerr_vec /= @max(rtol_vec, @abs(@as(V, y[j..][0..v_len].*)), @abs(@as(V, x[j..][0..v_len].*)));
+                        err_vec += rerr_vec * rerr_vec;
+                    }
+                    err = @reduce(.Add, err_vec);
+                    for (j..x_dim) |i| {
+                        k4[i] = h * (E1 * k1[i] + E3 * k3[i] + E4 * k4[i] + E5 * k5[i] + E6 * k6[i] + E7 * k2[i]);
+
+                        const rerr = k4[i] / @max(1e-5, @abs(y[i]), @abs(x[i]));
+                        err += rerr * rerr;
+                    }
+                } else {
                     for (0..x_dim) |i| {
                         k4[i] = h * (E1 * k1[i] + E3 * k3[i] + E4 * k4[i] + E5 * k5[i] + E6 * k6[i] + E7 * k2[i]);
 
-                        const rerr = k4[i] / @max(1e-5, @abs(y[i]), @abs(k2[i]));
+                        const rerr = k4[i] / @max(1e-5, @abs(y[i]), @abs(x[i]));
                         err += rerr * rerr;
                     }
-                    err = @sqrt(err / @as(f64, @floatFromInt(x_dim)));
-                    const fac = std.math.clamp(
-                        std.math.pow(f64, err / data.eps, 0.2),
-                        0.2,
-                        5.0,
-                    );
-                    var h_new = h * fac;
-                    if (err < data.eps) {
-                        // step accepted
-                        t.* = tph;
-                        for (0..x_dim) |i| {
-                            x[i] = y[i];
-                        }
-                        if (@abs(h_new) > data.h_max)
-                            h_new = sign * data.h_max;
-                        if (reject) {
-                            h_new = @min(@abs(h), @abs(h_new)) * sign;
-                            reject = false;
-                        }
-                    } else {
-                        // step rejected
-                        if (h_new != h_new) // h_new is NaN
-                            h_new = 0.6 * h;
-                        h_new = @min(@abs(h_new), @abs(h)) * sign;
-                        if (reject)
-                            h_new *= 0.9
-                        else
-                            reject = true;
-                    }
                 }
+                err = @sqrt(err / @as(f64, @floatFromInt(x_dim)));
+                const fac = std.math.clamp(
+                    std.math.pow(f64, err / data.eps, 0.2),
+                    0.2,
+                    5.0,
+                );
+                var h_new = h / fac;
+                if (err < data.eps) {
+                    // step accepted
+                    t.* = tph;
+                    for (0..x_dim) |i| {
+                        x[i] = y[i];
+                    }
+                    if (@abs(h_new) > data.h_max)
+                        h_new = sign * data.h_max;
+                    if (reject) {
+                        h_new = @min(@abs(h), @abs(h_new)) * sign;
+                        reject = false;
+                    }
+                } else {
+                    // step rejected
+                    if (h_new != h_new) // h_new is NaN
+                        h_new = 0.6 * h;
+                    h_new = @min(@abs(h_new), @abs(h)) * sign;
+                    if (reject)
+                        h_new *= 0.9
+                    else
+                        reject = true;
+                }
+                h = h_new;
+                if (comptime v_len > 0) h_vec = @splat(h_new);
             }
         }
-    }.integrate;
+    }._integrate;
 }
 
 pub const Factory = struct {
