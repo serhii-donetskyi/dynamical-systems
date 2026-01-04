@@ -74,8 +74,8 @@ fn integrate(comptime v_len: usize) fn (
 
             const data: *Data = @ptrCast(@alignCast(self.data));
             const x_dim = ode.getXDim();
-            if (x_dim != data.dim) {
-                if (data.buffer.len < x_dim * 5) {
+            if (x_dim != data.dim) { // check if we are using the correct integration function
+                if (data.buffer.len < x_dim * 5) { // check if we have enough buffer
                     data.buffer = try data.allocator.realloc(data.buffer, x_dim * 5);
                 }
                 data.dim = x_dim; // make sure check passes next time we call this function
@@ -108,10 +108,10 @@ fn integrate(comptime v_len: usize) fn (
                     if (comptime v_len > 0) h_vec = @splat(h);
                 }
 
-                // stage 1
+                // rk1
                 ode.calc(t.*, x, k1);
 
-                // stage 2
+                // rk2
                 if (comptime v_len > 0) {
                     var j = @as(usize, 0);
                     while (j + v_len <= x_dim) : (j += v_len) {
@@ -132,7 +132,7 @@ fn integrate(comptime v_len: usize) fn (
                 }
                 ode.calc(t.* + h * C, y, k2);
 
-                // stage 3
+                // rk3
                 if (comptime v_len > 0) {
                     var j = @as(usize, 0);
                     while (j + v_len <= x_dim) : (j += v_len) {
@@ -153,7 +153,7 @@ fn integrate(comptime v_len: usize) fn (
                 }
                 ode.calc(t.* + h * C, y, k3);
 
-                // stage 4
+                // rk4
                 if (comptime v_len > 0) {
                     var j = @as(usize, 0);
                     while (j + v_len <= x_dim) : (j += v_len) {
