@@ -69,7 +69,7 @@ pub fn run(self: *Job, solver: *Solver, ode: *Ode, w: *std.io.Writer, options: J
     try w.print("\n", .{});
 
     while (t < t_end) {
-        try solver.integrate(ode, &t, x.ptr, t_step);
+        try solver.integrate(ode, &t, x.ptr, t + t_step);
         try w.print("{s}", .{try std.fmt.float.render(buf[0..], t, options.float)});
         for (0..x_dim) |i| {
             try w.print("{c}{s}", .{ options.separator, try std.fmt.float.render(buf[0..], x[i], options.float) });
