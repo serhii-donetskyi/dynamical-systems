@@ -307,7 +307,7 @@ fn run() anyerror!void {
 
             try stdout.print("Output Options:\n", .{});
             for ([_]NameAndDescription{
-                .{ .name = "--float-precision <precision>", .description = "Float precision. Default is 5." },
+                .{ .name = "--float-precision <integer>", .description = "Float precision. Must be a non-negative integer. Default is 5." },
                 .{ .name = "--float-mode <mode>", .description = "Float mode. Possible values are 'decimal' and 'scientific'. Default is decimal." },
                 .{ .name = "--separator <character>", .description = "Separator character. Default is space." },
                 .{ .name = "--file <path>", .description = "Output file path. Default is '<ode-name>/<job-name>.txt'. Specify '-' to output to stdout.\n" },
