@@ -38,7 +38,7 @@ pub fn deinit(self: *Job) void {
     data.allocator.destroy(data);
 }
 
-pub fn run(self: *Job, solver: *Solver, ode: *Ode, w: *std.io.Writer, options: Job.Options) !void {
+pub fn run(self: *Job, solver: *Solver, ode: *Ode, w: *std.Io.Writer, options: Job.Options) !void {
     var buf: [128]u8 = undefined;
     const data: *Data = @ptrCast(@alignCast(self.data));
     const t_step = data.t_step;

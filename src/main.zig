@@ -1,7 +1,7 @@
 const std = @import("std");
 const ds = @import("dynamical_systems");
-const cli = @import("cli.zig");
+const Cli = @import("Cli.zig");
 
-pub fn main() !void {
-    try cli.main();
+pub fn main(init: std.process.Init) !void {
+    try Cli.main(&init);
 }

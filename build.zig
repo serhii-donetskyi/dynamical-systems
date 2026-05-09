@@ -56,14 +56,14 @@ pub fn build(b: *std.Build) !void {
     test_step.dependOn(&run_exe_tests.step);
 
     // Build dynamic libraries for job/ ode/ solver/ subdirectories
-    const cwd = std.fs.cwd();
+    const io = b.graph.io;
     inline for ([_][]const u8{ "job", "solver", "ode" }) |dir_name| {
         const dir_path = "src/dynamical_systems/" ++ dir_name;
-        var dir = try cwd.openDir(dir_path, .{ .iterate = true });
-        defer dir.close();
+        var dir = try std.Io.Dir.cwd().openDir(io, dir_path, .{ .iterate = true });
+        defer dir.close(io);
 
         var iter = dir.iterate();
-        while (try iter.next()) |entry| {
+        while (try iter.next(io)) |entry| {
             if (entry.kind == .file) {
                 const file_path = try std.fs.path.join(allocator, &.{ dir_path, entry.name });
                 defer allocator.free(file_path);

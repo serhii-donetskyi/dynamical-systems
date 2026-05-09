@@ -17,13 +17,13 @@ pub const Job = struct {
 
     pub const VTable = struct {
         deinit: *const fn (*Job) void,
-        run: *const fn (*Job, *Solver, *Ode, *std.io.Writer, Options) anyerror!void,
+        run: *const fn (*Job, *Solver, *Ode, *std.Io.Writer, Options) anyerror!void,
     };
 
     pub inline fn deinit(self: *Job) void {
         self.vtable.deinit(self);
     }
-    pub inline fn run(self: *Job, solver: *Solver, ode: *Ode, w: *std.io.Writer, options: Options) anyerror!void {
+    pub inline fn run(self: *Job, solver: *Solver, ode: *Ode, w: *std.Io.Writer, options: Options) anyerror!void {
         return self.vtable.run(self, solver, ode, w, options);
     }
 
@@ -70,7 +70,7 @@ pub const Skip = struct {
         data.allocator.destroy(data);
     }
 
-    pub fn run(self: *Job, solver: *Solver, ode: *Ode, w: *std.io.Writer, options: Job.Options) anyerror!void {
+    pub fn run(self: *Job, solver: *Solver, ode: *Ode, w: *std.Io.Writer, options: Job.Options) anyerror!void {
         _ = w;
         _ = options;
         const data: *Data = @ptrCast(@alignCast(self.data));
