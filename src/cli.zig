@@ -142,7 +142,8 @@ fn componentGetPair(self: *Cli, component: type) struct { []const u8, *StringHas
 fn componentLoad(self: *Cli, component: type) !void {
     const component_name, const map = self.componentGetPair(component);
 
-    const bin_dir = Dir.path.dirname(self.args.items[0]) orelse return Error.UnexpectedBinPath;
+    const bin_dir = std.process.executableDirPathAlloc(self.init.io, self.allocator) catch return Error.UnexpectedBinPath;
+    defer self.allocator.free(bin_dir);
     const app_dir = Dir.path.dirname(bin_dir) orelse return Error.UnexpectedAppPath;
     const lib_dir = try Dir.path.join(self.allocator, &.{ app_dir, "lib", component_name });
     defer self.allocator.free(lib_dir);

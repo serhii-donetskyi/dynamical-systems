@@ -39,7 +39,8 @@ pub fn deinit(self: *Job) void {
 }
 
 pub fn run(self: *Job, solver: *Solver, ode: *Ode, w: *std.Io.Writer, options: Job.Options) !void {
-    var buf: [128]u8 = undefined;
+    // Decimal f64 formatting can require hundreds of bytes (large |exponent| in internal representation).
+    var buf: [512]u8 = undefined;
     const data: *Data = @ptrCast(@alignCast(self.data));
     const t_step = data.t_step;
     const t_start = data.t_start;
