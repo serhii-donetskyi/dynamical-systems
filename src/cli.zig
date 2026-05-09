@@ -61,6 +61,7 @@ pub fn main(init: *const std.process.Init) !void {
         \\   ode-get-args <ode-name>           Get arguments for an ODE
         \\   solver-get-args <solver-name>     Get arguments for a solver
         \\   job-get-args <job-name>           Get arguments for a job
+        \\   run                               Run a dynamical system simulation
         \\
         \\ Options:
         \\   -h, --help     Show usage message and exit
@@ -99,6 +100,7 @@ pub fn main(init: *const std.process.Init) !void {
     try self.commands.put("ode-get-args", componentGetArguments(Ode));
     try self.commands.put("solver-get-args", componentGetArguments(Solver));
     try self.commands.put("job-get-args", componentGetArguments(Job));
+    try self.commands.put("run", run);
 
     if (self.args.items.len < 2) {
         try self.log("Error: missing command\n", .{});
@@ -262,40 +264,43 @@ fn componentCreate(self: *Cli, component: type, name: []const u8, cargs: []const
         return Error.UnknownComponent;
     };
 
-    var arg_map = ArgumentMap.init(self.allocator);
-    defer arg_map.deinit();
+    var fargs_map = ArgumentMap.init(self.allocator);
+    defer fargs_map.deinit();
 
-    const fargs = factory.getArguments();
-    const iargs = try self.allocator.alloc(ds.Argument, fargs.len);
-    defer self.allocator.free(iargs);
-
-    for (0..iargs.len) |i| {
-        iargs[i] = fargs[i];
-        try arg_map.put(iargs[i].name, &iargs[i]);
-    }
+    const fargs = blk: {
+        const default_fargs = factory.getArguments();
+        const fargs = try self.allocator.alloc(ds.Argument, default_fargs.len);
+        errdefer self.allocator.free(fargs);
+        for (0..default_fargs.len) |i| {
+            fargs[i] = default_fargs[i];
+            try fargs_map.put(fargs[i].name, &fargs[i]);
+        }
+        break :blk fargs;
+    };
+    defer self.allocator.free(fargs);
 
     for (cargs) |carg| {
         if (std.mem.indexOfScalar(u8, carg, '=')) |idx| {
             const aname = carg[0..idx];
             const avalue = carg[idx + 1 ..];
-            if (arg_map.get(aname)) |arg_ptr| {
-                _ = arg_map.remove(aname);
+            if (fargs_map.get(aname)) |arg_ptr| {
+                _ = fargs_map.remove(aname);
                 switch (arg_ptr.value) {
                     .u => |*u| {
                         u.* = std.fmt.parseInt(usize, avalue, 10) catch {
-                            try stderr.print("Error: invalid {s} argument '{s}': it must be a non-negative integer, got '{s}'\n", .{ pair.name, aname, avalue });
+                            try self.log("Error: invalid {s} argument '{s}': it must be a non-negative integer, got '{s}'\n", .{ cname, aname, avalue });
                             return Error.InvalidArgument;
                         };
                     },
                     .i => |*i| {
                         i.* = std.fmt.parseInt(isize, avalue, 10) catch {
-                            try stderr.print("Error: invalid {s} argument '{s}': it must be an integer, got '{s}'\n", .{ pair.name, aname, avalue });
+                            try self.log("Error: invalid {s} argument '{s}': it must be an integer, got '{s}'\n", .{ cname, aname, avalue });
                             return Error.InvalidArgument;
                         };
                     },
                     .f => |*f| {
                         f.* = std.fmt.parseFloat(f64, avalue) catch {
-                            try stderr.print("Error: invalid {s} argument '{s}': it must be a float, got '{s}'\n", .{ pair.name, aname, avalue });
+                            try self.log("Error: invalid {s} argument '{s}': it must be a float, got '{s}'\n", .{ cname, aname, avalue });
                             return Error.InvalidArgument;
                         };
                     },
@@ -304,219 +309,205 @@ fn componentCreate(self: *Cli, component: type, name: []const u8, cargs: []const
                     },
                 }
             } else {
-                try stderr.print("Error: unknown {s} argument '{s}'\n", .{ pair.name, aname });
+                try self.log("Error: unknown {s} argument '{s}'\n", .{ cname, aname });
                 return Error.UnknownArgument;
             }
         } else {
-            try stderr.print("Error: invalid {s} argument '{s}': it must be in the format 'name=value'\n", .{ pair.name, carg });
+            try self.log("Error: invalid {s} argument '{s}': it must be in the format 'name=value'\n", .{ cname, carg });
             return Error.InvalidArgument;
         }
     }
-    var iter = arg_map.keyIterator();
+    var iter = fargs_map.keyIterator();
     while (iter.next()) |key| {
-        try stderr.print("Error: missing {s} argument '{s}'\n", .{ pair.name, key.* });
+        try self.log("Error: missing {s} argument '{s}'\n", .{ cname, key.* });
         return Error.MissingArgument;
     }
 
-    return factory.init(allocator, iargs);
+    return factory.init(self.allocator, fargs);
 }
 
-// fn run() anyerror!void {
-//     const padding: [32]u8 = @splat(' ');
+fn run(self: *Cli) anyerror!void {
+    const usage =
+        \\ Usage: {0s} {1s} [arguments] [options]
+        \\
+        \\ Arguments:
+        \\   -ode <ode-name>
+        \\   -ode-arg <name=value>
+        \\   -t <float>
+        \\   -x <float>
+        \\   -p <float>
+        \\   -solver <solver-name>
+        \\   -solver-arg <name=value>
+        \\   -job <job-name>
+        \\   -job-arg <name=value>
+        \\
+        \\ Output Options:
+        \\   --float-precision <integer>
+        \\   --float-mode <mode>
+        \\   --separator <character>
+        \\   --file <path>
+        \\
+        \\ Global Options:
+        \\   -h,  --help
+        \\
+        \\ Example:
+        \\   {0s} {1s} \
+        \\      -ode linear -ode-arg n=2 -t 0 -x 0 -x 1 -p 0 -p 1 -p -1 -p 0 \
+        \\      -solver rk4 -solver-arg h_max=0.01 \
+        \\      -job portrait -job-arg t_step=0.1 -job-arg t_start=0.0 -job-arg t_end=10.0
+        \\
+    ;
 
-//     var ode_name: []const u8 = &.{};
-//     var ode_args: []const []const u8 = &.{};
-//     var ode_t: []const u8 = &.{};
-//     var ode_x: []const []const u8 = &.{};
-//     var ode_p: []const []const u8 = &.{};
-//     var solver_name: []const u8 = &.{};
-//     var solver_args: []const []const u8 = &.{};
-//     var job_name: []const u8 = &.{};
-//     var job_args: []const []const u8 = &.{};
+    var ode_name: []const u8 = &.{};
+    var ode_args: []const []const u8 = &.{};
+    var ode_t: []const u8 = &.{};
+    var ode_x: []const []const u8 = &.{};
+    var ode_p: []const []const u8 = &.{};
+    var solver_name: []const u8 = &.{};
+    var solver_args: []const []const u8 = &.{};
+    var job_name: []const u8 = &.{};
+    var job_args: []const []const u8 = &.{};
 
-//     var float_precision: []const u8 = "5";
-//     var float_mode: []const u8 = "decimal";
-//     var separator: []const u8 = " ";
-//     var file: []const u8 = "";
+    var float_precision: []const u8 = "5";
+    var float_mode: []const u8 = "decimal";
+    var separator: []const u8 = " ";
+    var file: []const u8 = "";
 
-//     var parser = try ArgParser.init(
-//         allocator,
-//         &.{
-//             .{ .name = "-ode", .ptr = .{ .str = &ode_name } },
-//             .{ .name = "-ode-arg", .ptr = .{ .list = &ode_args } },
-//             .{ .name = "-t", .ptr = .{ .str = &ode_t } },
-//             .{ .name = "-x", .ptr = .{ .list = &ode_x } },
-//             .{ .name = "-p", .ptr = .{ .list = &ode_p } },
-//             .{ .name = "-solver", .ptr = .{ .str = &solver_name } },
-//             .{ .name = "-solver-arg", .ptr = .{ .list = &solver_args } },
-//             .{ .name = "-job", .ptr = .{ .str = &job_name } },
-//             .{ .name = "-job-arg", .ptr = .{ .list = &job_args } },
-//             .{ .name = "--float-precision", .ptr = .{ .str = &float_precision } },
-//             .{ .name = "--float-mode", .ptr = .{ .str = &float_mode } },
-//             .{ .name = "--separator", .ptr = .{ .str = &separator } },
-//             .{ .name = "--file", .ptr = .{ .str = &file } },
-//         },
-//     );
-//     defer parser.deinit();
+    var parser = try ArgParser.init(
+        self.allocator,
+        &.{
+            .{ .name = "-ode", .ptr = .{ .str = &ode_name } },
+            .{ .name = "-ode-arg", .ptr = .{ .list = &ode_args } },
+            .{ .name = "-t", .ptr = .{ .str = &ode_t } },
+            .{ .name = "-x", .ptr = .{ .list = &ode_x } },
+            .{ .name = "-p", .ptr = .{ .list = &ode_p } },
+            .{ .name = "-solver", .ptr = .{ .str = &solver_name } },
+            .{ .name = "-solver-arg", .ptr = .{ .list = &solver_args } },
+            .{ .name = "-job", .ptr = .{ .str = &job_name } },
+            .{ .name = "-job-arg", .ptr = .{ .list = &job_args } },
+            .{ .name = "--float-precision", .ptr = .{ .str = &float_precision } },
+            .{ .name = "--float-mode", .ptr = .{ .str = &float_mode } },
+            .{ .name = "--separator", .ptr = .{ .str = &separator } },
+            .{ .name = "--file", .ptr = .{ .str = &file } },
+        },
+    );
+    defer parser.deinit();
 
-//     parser.parse(args[2..]) catch |err| switch (err) {
-//         ArgParser.Error.HelpRequested => {
-//             try stdout.print("Usage: {s} {s} [arguments] [options]\n", .{ args[0], args[1] });
-//             try stdout.print("\n", .{});
+    parser.parse(self.args.items[2..]) catch |err| switch (err) {
+        ArgParser.Error.HelpRequested => {
+            try self.log(usage, .{ self.args.items[0], self.args.items[1] });
+            return;
+        },
+        else => return err,
+    };
+    var ode = try self.componentCreate(Ode, ode_name, ode_args);
+    defer ode.deinit();
+    if (ode_t.len == 0) {
+        try self.log("Error: missing -t option\n", .{});
+        return Error.MissingArgument;
+    }
+    if (ode.getXDim() != ode_x.len) {
+        try self.log("Error: expected {d} initial state values, got {d}\n", .{ ode.getXDim(), ode_x.len });
+        return Error.InvalidArgument;
+    }
+    if (ode.getPDim() != ode_p.len) {
+        try self.log("Error: expected {d} parameter values, got {d}\n", .{ ode.getPDim(), ode_p.len });
+        return Error.InvalidArgument;
+    }
+    ode.setT(std.fmt.parseFloat(f64, ode_t) catch {
+        try self.log("Error: invalid -t value: expected a float, got '{s}'\n", .{ode_t});
+        return Error.InvalidArgument;
+    });
+    for (0..ode.getXDim()) |i| {
+        ode.setX(i, std.fmt.parseFloat(f64, ode_x[i]) catch {
+            try self.log("Error: invalid -x value: expected a float, got '{s}'\n", .{ode_x[i]});
+            return Error.InvalidArgument;
+        });
+    }
+    for (0..ode.getPDim()) |i| {
+        ode.setP(i, std.fmt.parseFloat(f64, ode_p[i]) catch {
+            try self.log("Error: invalid -p value: expected a float, got '{s}'\n", .{ode_p[i]});
+            return Error.InvalidArgument;
+        });
+    }
 
-//             try stdout.print("Arguments:\n", .{});
-//             for ([_]NameAndDescription{
-//                 .{ .name = "-ode <ode-name>", .description = "ODE to solve." },
-//                 .{ .name = "-ode-arg <name=value>", .description = "ODE argument. This is a list of 'name=value' pairs." },
-//                 .{ .name = "-t <float>", .description = "ODE's initial time." },
-//                 .{ .name = "-x <float>", .description = "ODE's initial state vector. This is a list of floats." },
-//                 .{ .name = "-p <float>", .description = "ODE's parameter vector. This is a list of floats.\n" },
-//                 .{ .name = "-solver <solver-name>", .description = "Solver to use." },
-//                 .{ .name = "-solver-arg <name=value>", .description = "Solver argument. This is a list of 'name=value' pairs.\n" },
-//                 .{ .name = "-job <job-name>", .description = "Job to run." },
-//                 .{ .name = "-job-arg <name=value>", .description = "Job argument. This is a list of 'name=value' pairs.\n" },
-//             }) |arg| {
-//                 try stdout.print("  {s}{s}{s}\n", .{ arg.name, padding[0 .. padding.len - arg.name.len], arg.description });
-//             }
+    var solver = try self.componentCreate(Solver, solver_name, solver_args);
+    defer solver.deinit();
 
-//             try stdout.print("Output Options:\n", .{});
-//             for ([_]NameAndDescription{
-//                 .{ .name = "--float-precision <integer>", .description = "Float precision. Must be a non-negative integer. Default is 5." },
-//                 .{ .name = "--float-mode <mode>", .description = "Float mode. Possible values are 'decimal' and 'scientific'. Default is decimal." },
-//                 .{ .name = "--separator <character>", .description = "Separator character. Default is space." },
-//                 .{ .name = "--file <path>", .description = "Output file path. Default is '<ode-name>/<job-name>.txt'. Specify '-' to output to stdout.\n" },
-//             }) |arg| {
-//                 try stdout.print("  {s}{s}{s}\n", .{ arg.name, padding[0 .. padding.len - arg.name.len], arg.description });
-//             }
+    var job = try self.componentCreate(Job, job_name, job_args);
+    defer job.deinit();
 
-//             try stdout.print("Global Options:\n", .{});
-//             for ([_]NameAndDescription{
-//                 .{ .name = "-h,  --help", .description = "Show usage message and exit" },
-//             }) |arg| {
-//                 try stdout.print("  {s}{s}{s}\n", .{ arg.name, padding[0 .. padding.len - arg.name.len], arg.description });
-//             }
+    const job_options = Job.Options{
+        .separator = blk: {
+            if (separator.len != 1) {
+                try self.log("Error: invalid --separator value: expected a single character, got '{s}'\n", .{separator});
+                return Error.InvalidArgument;
+            }
+            break :blk separator[0];
+        },
+        .float = .{ .precision = std.fmt.parseInt(usize, float_precision, 10) catch {
+            try self.log("Error: invalid --float-precision value: expected a non-negative integer, got '{s}'\n", .{float_precision});
+            return Error.InvalidArgument;
+        }, .mode = blk: {
+            if (std.mem.eql(u8, float_mode, "decimal")) break :blk .decimal;
+            if (std.mem.eql(u8, float_mode, "scientific")) break :blk .scientific;
+            try self.log("Error: invalid --float-mode value: expected 'decimal' or 'scientific', got '{s}'\n", .{float_mode});
+            return Error.InvalidArgument;
+        } },
+    };
+    if (std.mem.eql(u8, file, "-")) {
+        var buffer: [4096]u8 = undefined;
+        var stdout_file = File.stdout();
+        defer stdout_file.close(self.init.io);
+        var stdout_writer = stdout_file.writer(self.init.io, buffer[0..]);
+        defer stdout_writer.flush() catch {};
 
-//             try stdout.print("\n", .{});
-//             try stdout.print("Usage example:\n", .{});
-//             try stdout.print("{s} {s} \\\n", .{ args[0], args[1] });
-//             try stdout.print("  -ode linear \\\n", .{});
-//             try stdout.print("  -ode-arg n=2 \\\n", .{});
-//             try stdout.print("  -t 0 \\\n", .{});
-//             try stdout.print("  -x 0 -x 1 \\\n", .{});
-//             try stdout.print("  -p 0 -p 1 -p -1 -p 0 \\\n", .{});
-//             try stdout.print("  -solver rk4 \\\n", .{});
-//             try stdout.print("  -solver-arg h_max=0.01 \\\n", .{});
-//             try stdout.print("  -job portrait \\\n", .{});
-//             try stdout.print("  -job-arg t_step=0.1 -job-arg t_start=0.0 -job-arg t_end=10.0 \n", .{});
-//             try stdout.print("\n", .{});
+        try job.run(&solver, &ode, &stdout_writer.interface, job_options);
+        return;
+    }
 
-//             return;
-//         },
-//         else => return err,
-//     };
-//     var ode = try createComponent(Ode, ode_name, ode_args);
-//     defer ode.deinit();
-//     if (ode_t.len == 0) {
-//         try stderr.print("Error: missing -t option\n", .{});
-//         return Error.MissingArgument;
-//     }
-//     if (ode.getXDim() != ode_x.len) {
-//         try stderr.print("Error: expected {d} initial state values, got {d}\n", .{ ode.getXDim(), ode_x.len });
-//         return Error.InvalidArgument;
-//     }
-//     if (ode.getPDim() != ode_p.len) {
-//         try stderr.print("Error: expected {d} parameter values, got {d}\n", .{ ode.getPDim(), ode_p.len });
-//         return Error.InvalidArgument;
-//     }
-//     ode.setT(std.fmt.parseFloat(f64, ode_t) catch {
-//         try stderr.print("Error: invalid -t value: expected a float, got '{s}'\n", .{ode_t});
-//         return Error.InvalidArgument;
-//     });
-//     for (0..ode.getXDim()) |i| {
-//         ode.setX(i, std.fmt.parseFloat(f64, ode_x[i]) catch {
-//             try stderr.print("Error: invalid -x value: expected a float, got '{s}'\n", .{ode_x[i]});
-//             return Error.InvalidArgument;
-//         });
-//     }
-//     for (0..ode.getPDim()) |i| {
-//         ode.setP(i, std.fmt.parseFloat(f64, ode_p[i]) catch {
-//             try stderr.print("Error: invalid -p value: expected a float, got '{s}'\n", .{ode_p[i]});
-//             return Error.InvalidArgument;
-//         });
-//     }
+    const cwd = Dir.cwd();
+    var buffer: [4096]u8 = undefined;
+    if (file.len == 0) {
+        var w = std.Io.Writer.fixed(&buffer);
+        try w.print("{s}", .{ode_name});
+        if (ode_args.len > 0) {
+            try w.print("({s}", .{ode_args[0]});
+            for (ode_args[1..]) |arg| {
+                try w.print("_{s}", .{arg});
+            }
+            try w.print(")", .{});
+        }
+        try w.print("{c}", .{std.fs.path.sep});
+        if (ode_p.len > 0) {
+            try w.print("p=(", .{});
+            try w.print("{s}", .{ode_p[0]});
+            for (ode_p[1..]) |arg| {
+                try w.print(",{s}", .{arg});
+            }
+            try w.print(")", .{});
+        }
+        try w.print("t=({s})", .{ode_t});
+        try w.print("x=({s}", .{ode_x[0]});
+        for (ode_x[1..]) |arg| {
+            try w.print(",{s}", .{arg});
+        }
+        try w.print("){s}.txt", .{job_name});
 
-//     var solver = try createComponent(Solver, solver_name, solver_args);
-//     defer solver.deinit();
+        file = buffer[0..w.end];
+    }
 
-//     var job = try createComponent(Job, job_name, job_args);
-//     defer job.deinit();
+    if (Dir.path.dirname(file)) |dir| {
+        try cwd.createDirPath(self.init.io, dir);
+    }
 
-//     const job_options = Job.Options{
-//         .separator = blk: {
-//             if (separator.len != 1) {
-//                 try stderr.print("Error: invalid --separator value: expected a single character, got '{s}'\n", .{separator});
-//                 return Error.InvalidArgument;
-//             }
-//             break :blk separator[0];
-//         },
-//         .float = .{ .precision = std.fmt.parseInt(usize, float_precision, 10) catch {
-//             try stderr.print("Error: invalid --float-precision value: expected a non-negative integer, got '{s}'\n", .{float_precision});
-//             return Error.InvalidArgument;
-//         }, .mode = blk: {
-//             if (std.mem.eql(u8, float_mode, "decimal")) break :blk .decimal;
-//             if (std.mem.eql(u8, float_mode, "scientific")) break :blk .scientific;
-//             try stderr.print("Error: invalid --float-mode value: expected 'decimal' or 'scientific', got '{s}'\n", .{float_mode});
-//             return Error.InvalidArgument;
-//         } },
-//     };
-//     if (std.mem.eql(u8, file, "-")) {
-//         try job.run(&solver, &ode, stdout, job_options);
-//         return;
-//     }
+    var f = try cwd.createFile(self.init.io, file, .{});
+    defer f.close(self.init.io);
+    var fw = f.writer(self.init.io, buffer[0..]);
+    defer fw.flush() catch {};
 
-//     const cwd = std.fs.cwd();
-//     var buffer: [4096]u8 = undefined;
-//     if (file.len == 0) {
-//         var w = std.Io.Writer.fixed(&buffer);
-//         try w.print("{s}", .{ode_name});
-//         if (ode_args.len > 0) {
-//             try w.print("({s}", .{ode_args[0]});
-//             for (ode_args[1..]) |arg| {
-//                 try w.print("_{s}", .{arg});
-//             }
-//             try w.print(")", .{});
-//         }
-//         try w.print("{c}", .{std.fs.path.sep});
-//         if (ode_p.len > 0) {
-//             try w.print("p=(", .{});
-//             try w.print("{s}", .{ode_p[0]});
-//             for (ode_p[1..]) |arg| {
-//                 try w.print(",{s}", .{arg});
-//             }
-//             try w.print(")", .{});
-//         }
-//         try w.print("t=({s})", .{ode_t});
-//         try w.print("x=({s}", .{ode_x[0]});
-//         for (ode_x[1..]) |arg| {
-//             try w.print(",{s}", .{arg});
-//         }
-//         try w.print("){s}.txt", .{job_name});
-
-//         file = buffer[0..w.end];
-//     }
-
-//     if (std.fs.path.dirname(file)) |dir| {
-//         try cwd.makePath(dir);
-//     }
-
-//     var f = try cwd.createFile(file, .{});
-//     defer f.close();
-//     var fw = std.fs.File.writer(f, &buffer);
-//     const w = &fw.interface;
-//     defer w.flush() catch {};
-
-//     try job.run(&solver, &ode, w, job_options);
-// }
+    try job.run(&solver, &ode, &fw.interface, job_options);
+}
 
 // fn getOdeDimensions() anyerror!void {
 //     const padding: [32]u8 = @splat(' ');
