@@ -331,28 +331,31 @@ fn run(self: *Cli) anyerror!void {
         \\ Usage: {0s} {1s} [arguments] [options]
         \\
         \\ Arguments:
-        \\   -ode <ode-name>
-        \\   -ode-arg <name=value>
-        \\   -t <float>
-        \\   -x <float>
-        \\   -p <float>
-        \\   -solver <solver-name>
-        \\   -solver-arg <name=value>
-        \\   -job <job-name>
-        \\   -job-arg <name=value>
+        \\   -ode <ode-name>                                            Name of the ODE to simulate.
+        \\   -ode-arg <name=value> [-ode-arg <name=value> ...]          Arguments for the ODE.
+        \\   -t <float>                                                 Initial time.
+        \\   -x <float> [-x <float> ...]                                Initial state values.
+        \\   -p <float> [-p <float> ...]                                Initial parameter values.
+        \\   -solver <solver-name>                                      Name of the solver to use.
+        \\   -solver-arg <name=value> [-solver-arg <name=value> ...]    Arguments for the solver.
+        \\   -job <job-name>                                            Name of the job to run.
+        \\   -job-arg <name=value> [-job-arg <name=value> ...]          Arguments for the job.
         \\
         \\ Output Options:
-        \\   --float-precision <integer>
-        \\   --float-mode <mode>
-        \\   --separator <character>
-        \\   --file <path>
+        \\   --float-precision <integer>                                Number of decimal places to use for floating point numbers.
+        \\   --float-mode <mode>                                        Mode to use for floating point numbers.
+        \\   --separator <character>                                    Separator to use for output.
+        \\   --file <path>                                              Path to the file to write the output to.
         \\
         \\ Global Options:
-        \\   -h,  --help
+        \\   -h,  --help                                                Show usage message and exit.
         \\
         \\ Example:
         \\   {0s} {1s} \
-        \\      -ode linear -ode-arg n=2 -t 0 -x 0 -x 1 -p 0 -p 1 -p -1 -p 0 \
+        \\      -ode linear -ode-arg n=2 \
+        \\      -t 0 \
+        \\      -x 0 -x 1 \
+        \\      -p 0 -p 1 -p -1 -p 0 \
         \\      -solver rk4 -solver-arg h_max=0.01 \
         \\      -job portrait -job-arg t_step=0.1 -job-arg t_start=0.0 -job-arg t_end=10.0
         \\
