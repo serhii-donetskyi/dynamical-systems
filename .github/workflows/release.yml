@@ -16,7 +16,7 @@ jobs:
     strategy:
       matrix:
         target:
-          - x86_64-windows
+          - x86_64-linux
           - aarch64-macos
     runs-on: ubuntu-latest
     steps:

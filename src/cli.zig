@@ -22,11 +22,6 @@ const JobMap = StringHashMap(*const Job.Factory);
 
 const Cli = @This();
 
-const NameAndDescription = struct {
-    name: []const u8,
-    description: []const u8,
-};
-
 const Error = error{
     UnexpectedBinPath,
     UnexpectedAppPath,
@@ -61,6 +56,7 @@ pub fn main(init: *const std.process.Init) !void {
         \\   ode-get-args <ode-name>           Get arguments for an ODE
         \\   solver-get-args <solver-name>     Get arguments for a solver
         \\   job-get-args <job-name>           Get arguments for a job
+        \\   ode-get-dimensions <ode-name>     Get dimensions for an ODE
         \\   run                               Run a dynamical system simulation
         \\
         \\ Options:
@@ -101,6 +97,7 @@ pub fn main(init: *const std.process.Init) !void {
     try self.commands.put("solver-get-args", componentGetArguments(Solver));
     try self.commands.put("job-get-args", componentGetArguments(Job));
     try self.commands.put("run", run);
+    try self.commands.put("ode-get-dimensions", odeGetDimensions);
 
     if (self.args.items.len < 2) {
         try self.log("Error: missing command\n", .{});
@@ -513,179 +510,50 @@ fn run(self: *Cli) anyerror!void {
     try job.run(&solver, &ode, &fw.interface, job_options);
 }
 
-// fn getOdeDimensions() anyerror!void {
-//     const padding: [32]u8 = @splat(' ');
+fn odeGetDimensions(self: *Cli) anyerror!void {
+    const usage =
+        \\ Usage: {0s} {1s} [arguments] [options]
+        \\
+        \\ Arguments:
+        \\   -ode <ode-name>                                            Name of the ODE to simulate.
+        \\   -ode-arg <name=value> [-ode-arg <name=value> ...]          Arguments for the ODE.
+        \\
+        \\ Global Options:
+        \\   -h,  --help                                                Show usage message and exit.
+        \\
+        \\ Example:
+        \\   {0s} {1s} -ode linear -ode-arg n=2
+        \\
+    ;
 
-//     var ode_name: []const u8 = &.{};
-//     var ode_args: []const []const u8 = &.{};
+    var ode_name: []const u8 = &.{};
+    var ode_args: []const []const u8 = &.{};
 
-//     var parser = try ArgParser.init(
-//         allocator,
-//         &.{
-//             .{ .name = "-ode", .ptr = .{ .str = &ode_name } },
-//             .{ .name = "-ode-arg", .ptr = .{ .list = &ode_args } },
-//         },
-//     );
-//     defer parser.deinit();
+    var parser = try ArgParser.init(
+        self.allocator,
+        &.{
+            .{ .name = "-ode", .ptr = .{ .str = &ode_name } },
+            .{ .name = "-ode-arg", .ptr = .{ .list = &ode_args } },
+        },
+    );
+    defer parser.deinit();
 
-//     parser.parse(args[2..]) catch |err| switch (err) {
-//         ArgParser.Error.HelpRequested => {
-//             try stdout.print("Usage: {s} {s} [arguments] [options]\n", .{ args[0], args[1] });
-//             try stdout.print("\n", .{});
-//             try stdout.print("Arguments:\n", .{});
-//             for ([_]NameAndDescription{
-//                 .{ .name = "-ode <ode-name>", .description = "ODE to get dimensions for." },
-//                 .{ .name = "-ode-arg <name=value>", .description = "ODE argument. This is a list of 'name=value' pairs.\n" },
-//             }) |arg| {
-//                 try stdout.print("  {s}{s}{s}\n", .{ arg.name, padding[0 .. padding.len - arg.name.len], arg.description });
-//             }
+    parser.parse(self.args.items[2..]) catch |err| switch (err) {
+        ArgParser.Error.HelpRequested => {
+            try self.log(usage, .{ self.args.items[0], self.args.items[1] });
+            return;
+        },
+        else => return err,
+    };
 
-//             try stdout.print("General Options:\n", .{});
-//             for ([_]NameAndDescription{
-//                 .{ .name = "-h,  --help", .description = "Show usage message and exit" },
-//             }) |arg| {
-//                 try stdout.print("  {s}{s}{s}\n", .{ arg.name, padding[0 .. padding.len - arg.name.len], arg.description });
-//             }
+    var ode = try self.componentCreate(Ode, ode_name, ode_args);
+    defer ode.deinit();
 
-//             return;
-//         },
-//         else => return err,
-//     };
+    try self.log("Dimensions for '{s}':\n", .{ode_name});
+    try self.log("  phase dimension (x): {d}\n", .{ode.getXDim()});
+    try self.log("  parameter dimension (p): {d}\n", .{ode.getPDim()});
+}
 
-//     var ode = try createComponent(Ode, ode_name, ode_args);
-//     defer ode.deinit();
-
-//     try stdout.print("Dimensions for '{s}':\n", .{ode_name});
-//     try stdout.print("  phase dimension (x): {d}\n", .{ode.getXDim()});
-//     try stdout.print("  parameter dimension (p): {d}\n", .{ode.getPDim()});
-//     return;
-// }
-
-// fn loadCommands() !void {
-//     try commands.put("list-odes", listComponents(Ode));
-//     try commands.put("list-solvers", listComponents(Solver));
-//     try commands.put("list-jobs", listComponents(Job));
-//     try commands.put("get-ode-args", getComponentArguments(Ode));
-//     try commands.put("get-solver-args", getComponentArguments(Solver));
-//     try commands.put("get-job-args", getComponentArguments(Job));
-//     try commands.put("run", run);
-//     try commands.put("get-ode-dimensions", getOdeDimensions);
-// }
-
-// fn printUsage() !void {
-//     const padding: [32]u8 = @splat(' ');
-
-//     try stdout.print("Usage: {s} <command> [options]\n", .{args[0]});
-//     try stdout.print("\n", .{});
-
-//     try stdout.print("Commands:\n", .{});
-
-//     for ([_]NameAndDescription{
-//         .{ .name = "run", .description = "Run a dynamical system simulation\n" },
-//         .{ .name = "get-ode-dimensions", .description = "Get dimensions for an ODE\n" },
-//         .{ .name = "list-odes", .description = "List available ODEs" },
-//         .{ .name = "list-solvers", .description = "List available solvers" },
-//         .{ .name = "list-jobs", .description = "List available jobs\n" },
-//         .{ .name = "get-ode-args", .description = "Get arguments for an ODE" },
-//         .{ .name = "get-solver-args", .description = "Get arguments for a solver" },
-//         .{ .name = "get-job-args", .description = "Get arguments for a job\n" },
-//     }) |cnd| {
-//         try stdout.print("  {s}{s}{s}\n", .{ cnd.name, padding[0 .. padding.len - cnd.name.len], cnd.description });
-//     }
-
-//     try stdout.print("General Options:\n", .{});
-//     for ([_]NameAndDescription{
-//         .{ .name = "-h,  --help", .description = "Show usage message and exit" },
-//     }) |arg| {
-//         try stdout.print("  {s}{s}{s}\n", .{ arg.name, padding[0 .. padding.len - arg.name.len], arg.description });
-//     }
-// }
-
-// pub fn main(init: *std.process.Init) !void {
-//     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-//     defer arena.deinit();
-//     allocator = arena.allocator();
-
-//     const stdout_file = std.fs.File.stdout();
-//     var stdout_buffer: [4096]u8 = undefined;
-//     var stdout_fw = std.fs.File.writer(stdout_file, stdout_buffer[0..]);
-//     stdout = &stdout_fw.interface;
-//     defer stdout.flush() catch {};
-
-//     const stderr_file = std.fs.File.stderr();
-//     var stderr_buffer: [4096]u8 = undefined;
-//     var stderr_fw = std.fs.File.writer(stderr_file, stderr_buffer[0..]);
-//     stderr = &stderr_fw.interface;
-//     defer stderr.flush() catch {};
-
-//     var arg_list = try std.ArrayList([]const u8).initCapacity(allocator, 64);
-//     defer arg_list.deinit(allocator);
-
-//     var arg_iterator = try std.process.argsWithAllocator(allocator);
-//     defer arg_iterator.deinit();
-
-//     while (arg_iterator.next()) |arg| {
-//         try arg_list.append(allocator, arg);
-//     }
-//     args = arg_list.items;
-
-//     dyn_libs = try DynLibs.initCapacity(allocator, 8);
-//     defer {
-//         for (dyn_libs.items) |*lib| {
-//             lib.close();
-//         }
-//         dyn_libs.deinit(allocator);
-//     }
-
-//     commands = CommandMap.init(allocator);
-//     defer commands.deinit();
-//     odes = OdeMap.init(allocator);
-//     defer {
-//         var iter = odes.keyIterator();
-//         while (iter.next()) |key| {
-//             allocator.free(key.*);
-//         }
-//         odes.deinit();
-//     }
-//     solvers = SolverMap.init(allocator);
-//     defer {
-//         var iter = solvers.keyIterator();
-//         while (iter.next()) |key| {
-//             allocator.free(key.*);
-//         }
-//         solvers.deinit();
-//     }
-//     jobs = JobMap.init(allocator);
-//     defer {
-//         var iter = jobs.keyIterator();
-//         while (iter.next()) |key| {
-//             allocator.free(key.*);
-//         }
-//         jobs.deinit();
-//     }
-
-//     try loadCommands();
-//     try loadComponent(Ode);
-//     try loadComponent(Solver);
-//     try loadComponent(Job);
-
-//     if (args.len < 2) {
-//         try stderr.print("Error: missing command\n", .{});
-//         return Error.MissingCommand;
-//     }
-
-//     const command = commands.get(args[1]) orelse {
-//         if (std.mem.eql(u8, args[1], "-h") or std.mem.eql(u8, args[1], "--help")) {
-//             try printUsage();
-//             return;
-//         }
-//         try stderr.print("Error: unknown command: '{s}'\n", .{args[1]});
-//         return Error.UnknownCommand;
-//     };
-
-//     return try command();
-// }
-
-// test {
-//     _ = ArgParser;
-// }
+test {
+    _ = ArgParser;
+}
