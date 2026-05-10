@@ -120,7 +120,7 @@ fn deinit(self: *Cli) void {
     self.jobs.deinit();
     self.dyn_libs.deinit(self.allocator);
     self.args.deinit(self.allocator);
-    // self.stderr.flush() catch {};
+    self.stderr.flush() catch {};
 }
 
 fn log(self: *Cli, comptime fmt: []const u8, args: anytype) !void {
